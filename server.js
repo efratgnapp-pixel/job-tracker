@@ -10,7 +10,7 @@ const path  = require('path');
 
 const { Document, Packer, Paragraph, TextRun, AlignmentType, BorderStyle } = require('docx');
 
-const PORT    = 3001;
+const PORT    = process.env.PORT || 3001;
 const HTML    = path.join(__dirname, 'job-tracker.html');
 const API_KEY = process.env.ANTHROPIC_API_KEY;
 
@@ -1166,7 +1166,7 @@ Be direct and specific. Focus on the most impactful action for this week. Do not
   res.writeHead(404); res.end('Not found');
 });
 
-server.listen(PORT, '127.0.0.1', () => {
+server.listen(PORT, () => {
   console.log('');
   console.log('  ┌─ Job Tracker proxy server ──────────────────────┐');
   console.log(`  │  http://localhost:${PORT}/job-tracker.html         │`);
