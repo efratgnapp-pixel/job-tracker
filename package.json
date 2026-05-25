@@ -1,0 +1,6 @@
+{
+  "dependencies": {
+    "docx": "^9.6.1",
+    "dotenv": "^17.4.2"
+  }
+}

@@ -1,0 +1,49 @@
+EFRAT GNAPP
+Project Manager | Business Operations Manager
+NW8 7BS, London · (+44) 7846 676635 · efrat.gnapp@gmail.com · LinkedIn
+
+Project Manager with 5+ years managing complex technical implementations and onboarding projects in a global technology organisation. Proven track record delivering SaaS-style implementations end-to-end, managing cross-functional teams, and ensuring successful adoption by 100+ users. Skilled at translating client requirements into executable technical plans while maintaining strong stakeholder relationships at all levels.
+
+KEY ACHIEVEMENTS
+- LED COMPLEX, CROSS-FUNCTIONAL DELIVERY OF THREE PRODUCT PROGRAMS (total budget ~$40M), coordinating R&D, QA, Marketing, and Operations, delivering all milestones on time and within budget, including high-profile launches at the Drupa 2024 show.
+- IMPROVED PROGRAMME PLANNING AND DELIVERY EFFICIENCY by introducing Lean practices and a global forecasting model, strengthening resource planning, reducing delivery bottlenecks, and improving decision-making across EMEA, APJ and North America.
+- DELIVERED ORGANISATION-WIDE JIRA IMPLEMENTATION ACROSS OPERATIONS, leading end-to-end planning, governance, data migration of 5 years of legacy records, and adoption by 100+ engineers, significantly improving operational visibility, controls, and standardised ways of working.
+
+KEY EXPERIENCE & SKILLS
+PROJECT MANAGEMENT (R&D & OPERATIONS): Managed complex, cross-functional projects across engineering, product, QA, marketing, and operations, delivering multiple product releases on time and within agreed scope.
+BUSINESS PLANNING & FORECASTING: Managed demand forecasting and business planning activities, implementing data-driven models and dashboards (Tableau, advanced Excel) to improve production planning and decision-making.
+RESOURCE, CAPACITY & BUDGET PLANNING: Led resource allocation, capacity planning, and budget monitoring to support high-volume product lines and ensure effective utilisation of engineering and operational resources.
+STAKEHOLDER ENGAGEMENT & COMMUNICATION: Worked closely with global stakeholders and senior leadership, providing clear reporting, managing dependencies, and supporting informed decision-making across teams.
+AGILE & LEAN DELIVERY: Applied Agile and Lean methodologies to standardise processes, reduce delivery bottlenecks, and improve efficiency across concurrent projects and product lines.
+
+WORK EXPERIENCE
+HP INDIGO | Feb. 2019 – Aug. 2024
+
+// PROJECT MANAGER, R&D | Sep 2022 – Aug. 2024
+Led complex cross-functional delivery of three product programs simultaneously, coordinating R&D, QA, Marketing, and Operations, with annual budgets totalling c. $40M, delivered all milestones on time and within budget, including high-profile launches at the Drupa 2024 show.
+- Increased delivery efficiency and reduced bottlenecks by applying Lean management methodologies, optimising resource allocation across three concurrent product lines.
+- Partnered with senior leadership to support quarterly and annual business reviews, delivering structured reporting and clear risk visibility to enable executive decision-making.
+- Proactively surfaced risks and cross-functional blockers to leadership, ensuring timely resolution and protecting strategic milestones.
+- Managed technical requirements and data dependencies across complex integrations, working closely with engineering teams to ensure successful system implementations.
+
+// BUSINESS PLANNER | Sep. 2021 – Sep. 2022
+- Improved programme planning and delivery efficiency by introducing Lean practices and a global forecasting model across EMEA, APJ and North America.
+- Increased forecasting accuracy and reduced manual workload by implementing a new demand prediction model, improving production prioritisation in collaboration with marketing and regional sales teams.
+- Translated operational and supply chain data into executive-ready insights through Tableau dashboards, enabling leadership to identify risks and optimise allocation decisions.
+- Maintained service continuity during supply limitations by partnering with sourcing and procurement to identify alternatives and mitigate risks.
+- Operated within a complex, matrixed global organisation, aligning R&D, Finance, Marketing, Operations, and regional teams.
+
+// PROCESS SPECIALIST, OPERATIONAL EXCELLENCE | Feb 2019 – Sep 2021
+- Drove process improvement and system implementation, including design, rollout, and adoption of Jira across 100+ users.
+- Achieved full adoption of Jira by managing the complete implementation lifecycle: requirements gathering, technical configuration, API-based data migration, integration with existing tools, and comprehensive user training.
+- Successfully migrated 5 years of historical records from legacy Excel systems into Jira on time and without operational disruption.
+- Optimised resource allocation and reduced production cycle times by planning and monitoring annual budgets and improving workflows across engineering and manufacturing teams.
+
+EDUCATION
+B.Sc. INDUSTRIAL ENGINEERING & MANAGEMENT (DIGITAL SYSTEMS MANAGEMENT)
+Shenkar College of Engineering and Design | 2016 – 2021
+
+OTHER INFORMATION
+Right to work: UK citizen
+Languages: English (fluent), Hebrew (native)
+Availability: Open to hybrid and on-site roles across London and Greater London

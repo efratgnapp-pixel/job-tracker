@@ -1,0 +1,15 @@
+# Secrets
+.env
+
+# Dependencies
+node_modules/
+
+# Logs
+server.log
+*.log
+
+# Claude Code project files
+.claude/
+
+# macOS
+.DS_Store
