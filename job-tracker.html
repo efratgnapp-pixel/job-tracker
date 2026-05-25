@@ -984,7 +984,6 @@
   <div class="table-footer" id="tableFooter"></div>
 </div>
 
-<div id="appliedSection"></div>
 <div id="rejectedSection"></div>
 <div id="archivedSection"></div>
 
@@ -1468,7 +1467,6 @@
   let sortField = 'dateApplied';
   let sortDir = 'desc';
   let filterFollowUp = false;
-  let appliedCollapsed = false;
   let rejectedCollapsed = false;
   let archivedCollapsed = false;
   let _keySkillsJobId = null;
@@ -1556,7 +1554,7 @@
     const q = document.getElementById('searchInput').value.trim().toLowerCase();
     const s = document.getElementById('filterStatus').value;
     return jobs.filter(j => {
-      if (j.status === 'Applied' || j.status === 'Rejected' || j.status === 'Archived') return false;
+      if (j.status === 'Rejected' || j.status === 'Archived') return false;
       const matchQ = !q || [j.company, j.role, j.notes, j.nextAction, j.linkedin, j.referredBy]
         .some(v => v && v.toLowerCase().includes(q));
       const matchS = !s || j.status === s;
@@ -1774,98 +1772,8 @@
     renderStats();
     renderFollowUpBanner();
     renderTable(sortedJobs(filteredJobs()));
-    renderAppliedTable();
     renderRejectedTable();
     renderArchivedTable();
-  }
-
-  function toggleApplied() {
-    appliedCollapsed = !appliedCollapsed;
-    renderAppliedTable();
-  }
-
-  function renderAppliedTable() {
-    const el = document.getElementById('appliedSection');
-    if (!el) return;
-    const applied = jobs.filter(j => j.status === 'Applied');
-    if (applied.length === 0) { el.innerHTML = ''; return; }
-
-    const chevronClass = 'rejected-chevron' + (appliedCollapsed ? '' : ' open');
-    let html = `<div class="rejected-section"><div class="rejected-card">
-      <div class="rejected-header" onclick="toggleApplied()">
-        <span class="${chevronClass}">▶</span>
-        Applied Applications (${applied.length})
-      </div>`;
-
-    if (!appliedCollapsed) {
-      html += `<div class="table-wrap"><table>
-        <thead><tr>
-          <th style="width:16%">Company</th>
-          <th style="width:20%">Role</th>
-          <th style="width:100px">Date Applied</th>
-          <th style="width:120px">Status</th>
-          <th style="width:68px;text-align:center">Score</th>
-          <th style="width:110px">LinkedIn</th>
-          <th style="width:110px">Referred By</th>
-          <th style="width:120px">Next Action</th>
-          <th style="width:90px">Due Date</th>
-          <th style="width:108px"></th>
-        </tr></thead>
-        <tbody>
-          ${applied.map(j => { const dueClass = dueDateClass(j.nextActionDate); return `<tr>
-            <td class="td-company">${escHtml(j.company)}</td>
-            <td class="td-role">${escHtml(j.role)}</td>
-            <td style="white-space:nowrap">${fmtDate(j.dateApplied)}</td>
-            <td id="statusCell-${j.id}"><span class="badge badge-${j.status} badge-clickable" onclick="openInlineStatus('${j.id}', event)" title="Click to change status">${j.status}</span>${j.interviews?.length ? `<span class="badge badge-round">Round ${j.interviews.length}</span>` : ''}${needsFollowUp(j) ? '<span class="badge badge-followup">Follow Up</span>' : ''}</td>
-            <td id="scoreCell-${j.id}" style="text-align:center;padding:10px 6px">${j.matchScore ? scoreChip(j.matchScore) : `<button class="btn btn-ghost btn-sm" style="font-size:.72rem;padding:3px 7px" onclick="fetchTableScore('${j.id}')">Score</button>`}</td>
-            <td style="max-width:130px">${liCellHtml(j)}</td>
-            <td style="max-width:110px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${j.referredBy ? escHtml(j.referredBy) : '<span style="color:var(--text-muted)">—</span>'}</td>
-            <td style="max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${j.nextAction ? escHtml(j.nextAction) : '<span style="color:var(--text-muted)">—</span>'}</td>
-            <td class="${dueClass}" style="white-space:nowrap">${dueDateLabel(j.nextActionDate)}</td>
-            <td class="td-actions">
-              ${needsFollowUp(j) ? `<button class="btn btn-followup btn-sm" onclick="logFollowUp('${j.id}')">✓ Followed Up</button>` : ''}
-              <div class="row-menu">
-                <button class="btn btn-ghost btn-sm" onclick="toggleRowMenu('${j.id}', event)" title="Actions">
-                  Actions <svg width="11" height="11" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24" style="margin-left:2px;vertical-align:middle"><polyline points="6 9 12 15 18 9"/></svg>
-                </button>
-                <div class="row-menu-drop" id="rowMenuDrop-${j.id}">
-                  <button class="row-menu-item" onclick="closeRowMenus(); openTailorModal('${j.id}')">
-                    <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>Tailor CV
-                  </button>
-                  <button class="row-menu-item" onclick="closeRowMenus(); openClModal('${j.id}')">
-                    <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="9" y1="13" x2="15" y2="13"/><line x1="9" y1="17" x2="15" y2="17"/></svg>Cover Letter
-                  </button>
-                  <button class="row-menu-item" onclick="closeRowMenus(); openLiModal('${j.id}')">
-                    <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>LinkedIn
-                  </button>
-                  <button class="row-menu-item" onclick="closeRowMenus(); openSalaryModal('${j.id}')">
-                    <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>Salary
-                  </button>
-                  <button class="row-menu-item" onclick="closeRowMenus(); openResearchModal('${j.id}')">
-                    <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>Research Company
-                  </button>
-                  <button class="row-menu-item" onclick="closeRowMenus(); openKeySkillsModal('${j.id}')">
-                    <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>Key Skills
-                  </button>
-                  <button class="row-menu-item" onclick="closeRowMenus(); openOutreachModal('${j.id}')">
-                    <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>Draft Outreach
-                  </button>
-                  <div class="row-menu-sep"></div>
-                  <button class="row-menu-item" onclick="closeRowMenus(); openModal('${j.id}')">
-                    <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>Edit
-                  </button>
-                  <button class="row-menu-item row-menu-danger" onclick="closeRowMenus(); deleteJob('${j.id}')">
-                    <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/></svg>Delete
-                  </button>
-                </div>
-              </div>
-            </td>
-          </tr>`; }).join('')}
-        </tbody>
-      </table></div>`;
-    }
-    html += '</div></div>';
-    el.innerHTML = html;
   }
 
   function toggleRejected() {
