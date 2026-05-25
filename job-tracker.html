@@ -910,6 +910,11 @@
           <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
           LinkedIn Connections
         </button>
+        <div class="row-menu-sep"></div>
+        <button class="row-menu-item" onclick="closeRowMenus(); openJsonImportModal()">
+          <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="9" y1="13" x2="15" y2="13"/><line x1="9" y1="17" x2="15" y2="17"/></svg>
+          Import Data (JSON)
+        </button>
       </div>
     </div>
     <button id="scoreAllBtn" class="btn btn-ghost" onclick="scoreAll()">
@@ -1394,6 +1399,36 @@
         <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
         Download as PDF
       </button>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="jsonImportOverlay" onclick="handleJsonImportOverlayClick(event)">
+  <div class="modal" style="max-width:520px">
+    <div class="modal-header">
+      <div>
+        <h2>Import Data (JSON)</h2>
+        <p style="font-size:.8rem;color:var(--text-muted);margin-top:2px">Paste or upload a previously exported JSON backup</p>
+      </div>
+      <button class="close-btn" onclick="closeJsonImportModal()" title="Close">
+        <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+    <div style="padding:20px 24px 4px;display:flex;flex-direction:column;gap:14px">
+      <div class="form-group" style="margin:0">
+        <label for="jsonImportFile">Upload JSON file</label>
+        <input type="file" id="jsonImportFile" accept=".json,application/json" onchange="onJsonFileChange(event)" style="font-size:.845rem;padding:6px 0">
+      </div>
+      <div style="text-align:center;font-size:.78rem;color:var(--text-muted)">— or paste JSON below —</div>
+      <div class="form-group" style="margin:0">
+        <label for="jsonImportText">JSON data</label>
+        <textarea id="jsonImportText" placeholder='[{"id":"...","company":"..."}]' style="min-height:120px;font-size:.78rem;font-family:monospace;resize:vertical;width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--surface);color:var(--text)" oninput="onJsonImportTextChange()"></textarea>
+      </div>
+      <div id="jsonImportStatus" style="font-size:.82rem;min-height:18px"></div>
+    </div>
+    <div class="modal-footer">
+      <button type="button" class="btn btn-ghost" onclick="closeJsonImportModal()">Cancel</button>
+      <button type="button" class="btn btn-primary" id="jsonImportBtn" disabled onclick="commitJsonImport()">Import</button>
     </div>
   </div>
 </div>
@@ -2015,7 +2050,7 @@
     if (e.target === document.getElementById('overlay')) closeModal();
   }
 
-  document.addEventListener('keydown', e => { if (e.key === 'Escape') { closeModal(); closeImportModal(); closeIndeedModal(); closeTailorModal(); closeClModal(); closeLiModal(); closeLiImportModal(); closeWsModal(); closeRejectionModal(); closeRowMenus(); } });
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') { closeModal(); closeImportModal(); closeIndeedModal(); closeTailorModal(); closeClModal(); closeLiModal(); closeLiImportModal(); closeWsModal(); closeRejectionModal(); closeJsonImportModal(); closeRowMenus(); } });
   document.addEventListener('click', closeRowMenus);
 
   document.addEventListener('keydown', async e => {
@@ -2777,6 +2812,74 @@
 
   function handleLiImportOverlayClick(e) {
     if (e.target === document.getElementById('liImportOverlay')) closeLiImportModal();
+  }
+
+  // ── JSON Data Import ─────────────────────────────────────
+  let _jsonImportParsed = null;
+
+  function openJsonImportModal() {
+    _jsonImportParsed = null;
+    document.getElementById('jsonImportText').value = '';
+    document.getElementById('jsonImportFile').value = '';
+    document.getElementById('jsonImportStatus').textContent = '';
+    document.getElementById('jsonImportBtn').disabled = true;
+    document.getElementById('jsonImportOverlay').classList.add('open');
+    document.body.style.overflow = 'hidden';
+  }
+
+  function closeJsonImportModal() {
+    document.getElementById('jsonImportOverlay').classList.remove('open');
+    document.body.style.overflow = '';
+    _jsonImportParsed = null;
+  }
+
+  function handleJsonImportOverlayClick(e) {
+    if (e.target === document.getElementById('jsonImportOverlay')) closeJsonImportModal();
+  }
+
+  function validateJsonImport(text) {
+    const status = document.getElementById('jsonImportStatus');
+    const btn = document.getElementById('jsonImportBtn');
+    _jsonImportParsed = null;
+    btn.disabled = true;
+    if (!text.trim()) { status.textContent = ''; return; }
+    try {
+      const parsed = JSON.parse(text);
+      const arr = Array.isArray(parsed) ? parsed : Object.values(parsed);
+      if (!arr.length) { status.style.color = '#d97706'; status.textContent = 'JSON parsed but contains no entries.'; return; }
+      _jsonImportParsed = arr;
+      status.style.color = '#16a34a';
+      status.textContent = `✓ Valid — ${arr.length} job${arr.length !== 1 ? 's' : ''} found.`;
+      btn.disabled = false;
+    } catch (e) {
+      status.style.color = '#dc2626';
+      status.textContent = 'Invalid JSON: ' + e.message;
+    }
+  }
+
+  function onJsonImportTextChange() {
+    validateJsonImport(document.getElementById('jsonImportText').value);
+  }
+
+  function onJsonFileChange(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = ev => {
+      document.getElementById('jsonImportText').value = ev.target.result;
+      validateJsonImport(ev.target.result);
+    };
+    reader.readAsText(file);
+  }
+
+  function commitJsonImport() {
+    if (!_jsonImportParsed) return;
+    if (!confirm(`This will replace all current job data with ${_jsonImportParsed.length} imported job${_jsonImportParsed.length !== 1 ? 's' : ''}. Continue?`)) return;
+    jobs = _jsonImportParsed;
+    save();
+    load();
+    render();
+    closeJsonImportModal();
   }
 
   function handleLiCsvFile(file) {
