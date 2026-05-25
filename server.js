@@ -1172,6 +1172,27 @@ Be direct and specific. Focus on the most impactful action for this week. Do not
     return;
   }
 
+  if (req.method === 'POST' && pathname === '/api/feedback') {
+    let body = '';
+    req.on('data', d => body += d);
+    req.on('end', () => {
+      try {
+        const { message, name } = JSON.parse(body);
+        if (!message?.trim()) { send(res, 400, { error: 'message is required' }); return; }
+        const entry = { timestamp: new Date().toISOString(), name: (name || '').trim() || null, message: message.trim() };
+        const file = path.join(__dirname, 'feedback.json');
+        let existing = [];
+        try { existing = JSON.parse(fs.readFileSync(file, 'utf8')); } catch {}
+        existing.push(entry);
+        fs.writeFileSync(file, JSON.stringify(existing, null, 2));
+        send(res, 200, { ok: true });
+      } catch (err) {
+        send(res, 500, { error: err.message });
+      }
+    });
+    return;
+  }
+
   res.writeHead(404); res.end('Not found');
 });
 
