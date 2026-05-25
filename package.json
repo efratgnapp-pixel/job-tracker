@@ -1,7 +1,7 @@
 {
   "main": "server.js",
   "scripts": {
-    "start": "node test-server.js"
+    "start": "node server.js"
   },
   "dependencies": {
     "docx": "^9.6.1",
