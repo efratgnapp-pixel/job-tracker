@@ -14,6 +14,15 @@ const PORT    = process.env.PORT || 3001;
 const HTML    = path.join(__dirname, 'job-tracker.html');
 const API_KEY = process.env.ANTHROPIC_API_KEY;
 
+process.on('uncaughtException', err => {
+  console.error('[uncaughtException]', err);
+  process.exit(1);
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('[unhandledRejection]', reason, promise);
+});
+
 // ── CV text parser (shared by docx builder) ────────────────────────────────
 function parseCvText(text) {
   const lines = text.split('\n');
@@ -1166,19 +1175,24 @@ Be direct and specific. Focus on the most impactful action for this week. Do not
   res.writeHead(404); res.end('Not found');
 });
 
-server.listen(PORT, () => {
-  console.log('');
-  console.log('  ┌─ Job Tracker proxy server ──────────────────────┐');
-  console.log(`  │  http://localhost:${PORT}/job-tracker.html         │`);
-  console.log('  └─────────────────────────────────────────────────┘');
-  if (!API_KEY) {
+try {
+  server.listen(PORT, () => {
     console.log('');
-    console.log('  ⚠  ANTHROPIC_API_KEY is not set.');
-    console.log('     Screenshot extraction will fail until you set it:');
-    console.log('     export ANTHROPIC_API_KEY=sk-ant-...');
-    console.log('     Then restart this server.');
-  } else {
-    console.log('  ✓  ANTHROPIC_API_KEY detected — ready to extract screenshots');
-  }
-  console.log('');
-});
+    console.log('  ┌─ Job Tracker proxy server ──────────────────────┐');
+    console.log(`  │  http://localhost:${PORT}/job-tracker.html         │`);
+    console.log('  └─────────────────────────────────────────────────┘');
+    if (!API_KEY) {
+      console.log('');
+      console.log('  ⚠  ANTHROPIC_API_KEY is not set.');
+      console.log('     Screenshot extraction will fail until you set it:');
+      console.log('     export ANTHROPIC_API_KEY=sk-ant-...');
+      console.log('     Then restart this server.');
+    } else {
+      console.log('  ✓  ANTHROPIC_API_KEY detected — ready to extract screenshots');
+    }
+    console.log('');
+  });
+} catch (err) {
+  console.error('[startup error]', err);
+  process.exit(1);
+}
