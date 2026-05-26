@@ -2229,7 +2229,7 @@
     document.getElementById('importError').style.display = 'none';
 
     try {
-      const res = await fetch('http://localhost:3001/api/extract', {
+      const res = await fetch('/api/extract', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ imageData: importImageData, mediaType: importMediaType })
@@ -2447,7 +2447,7 @@
     // Either no score yet, or legacy entry with number only — call API to get full breakdown
     try {
       const body = JSON.stringify({ role: j.role, company: j.company, notes: j.notes || '', jobDescription: j.jobDescription || '' });
-      const res  = await fetch('http://localhost:3001/api/match-score', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body });
+      const res  = await fetch('/api/match-score', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body });
       const data = await res.json();
       if (res.ok && data.score) {
         const s = parseInt(data.score);
@@ -2473,7 +2473,7 @@
       // CV fetch and score lookup run in parallel.
       // getOrGenerateScore returns the cache immediately if the score exists.
       const [cvRes, scoreData] = await Promise.all([
-        fetch('http://localhost:3001/api/tailor-cv', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body }),
+        fetch('/api/tailor-cv', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body }),
         getOrGenerateScore(j.id),
       ]);
 
@@ -2615,7 +2615,7 @@
     btn.disabled = true;
     btn.innerHTML = `<span class="spinner" style="border-color:rgba(255,255,255,.4);border-top-color:#fff"></span> Generating…`;
     try {
-      const res = await fetch('http://localhost:3001/api/tailor-cv-docx', {
+      const res = await fetch('/api/tailor-cv-docx', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ cvText: _tailoredCvText, role: _tailorJob.role, company: _tailorJob.company }),
@@ -2660,7 +2660,7 @@
 
   async function fetchIndeedJobs() {
     try {
-      const res = await fetch('http://localhost:3001/api/indeed-jobs');
+      const res = await fetch('/api/indeed-jobs');
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || `Server error ${res.status}`);
       renderIndeedResults(data.jobs || []);
@@ -3245,7 +3245,7 @@
 
   async function fetchCoverLetter(j) {
     try {
-      const res  = await fetch('http://localhost:3001/api/cover-letter', {
+      const res  = await fetch('/api/cover-letter', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ role: j.role, company: j.company, notes: j.notes || '', jobDescription: j.jobDescription || '' }),
@@ -3308,7 +3308,7 @@
     btn.disabled   = true;
     btn.innerHTML  = `<span class="spinner" style="border-color:rgba(255,255,255,.4);border-top-color:#fff"></span> Generating…`;
     try {
-      const res = await fetch('http://localhost:3001/api/cover-letter-docx', {
+      const res = await fetch('/api/cover-letter-docx', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ letterText: _clText, role: _clJob.role, company: _clJob.company }),
@@ -3410,7 +3410,7 @@
     const totalWithReason = Object.entries(rejCounts).filter(([k]) => k !== '_no_reason').reduce((s,[,v]) => s+v, 0);
     if (totalWithReason === 0) { loading.style.display = 'none'; return; }
     try {
-      const res = await fetch('http://localhost:3001/api/rejection-insight', {
+      const res = await fetch('/api/rejection-insight', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ rejCounts, total: rejectedAll.length }),
@@ -3609,7 +3609,7 @@
 
   async function fetchSalary(j) {
     try {
-      const res = await fetch('http://localhost:3001/api/salary', {
+      const res = await fetch('/api/salary', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ role: j.role, company: j.company, jobDescription: j.jobDescription || '' }),
@@ -3701,7 +3701,7 @@
 
   async function fetchCompanyResearch(j) {
     try {
-      const res = await fetch('http://localhost:3001/api/company-research', {
+      const res = await fetch('/api/company-research', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ role: j.role, company: j.company }),
@@ -3820,7 +3820,7 @@
 
   async function fetchOutreachDraft(j) {
     try {
-      const res = await fetch('http://localhost:3001/api/draft-outreach', {
+      const res = await fetch('/api/draft-outreach', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -3908,7 +3908,7 @@
 
   async function fetchKeySkills(j) {
     try {
-      const res = await fetch('http://localhost:3001/api/key-skills', {
+      const res = await fetch('/api/key-skills', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ role: j.role, company: j.company, jobDescription: j.jobDescription || '', notes: j.notes || '' }),
@@ -4167,7 +4167,7 @@
     const topScored = [...scored].sort((a,b) => b.matchScore - a.matchScore).slice(0,3)
       .map(j => ({ role: j.role, company: j.company, score: j.matchScore, status: j.status }));
     try {
-      const res = await fetch('http://localhost:3001/api/weekly-recommendation', {
+      const res = await fetch('/api/weekly-recommendation', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ thisWeekCount, pipeline, followUpCount, topScored }),
