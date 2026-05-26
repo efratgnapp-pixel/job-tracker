@@ -431,6 +431,8 @@ Score guide: 9–10 = near-perfect PM/ops delivery role, tech or startup context
 
     const prompt = `You are an expert CV writer. Tailor the CV below for the specific job application, preserving the EXACT format and structure of the original.
 
+NEVER change, invent, or modify any factual information including education, university names, degree titles, dates, company names, or job titles. Only reword bullet points and adjust emphasis to match the job description. All facts must remain exactly as in the original CV.
+
 JOB DETAILS:
 Role: ${role}
 Company: ${company}
