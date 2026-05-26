@@ -419,7 +419,7 @@ Score guide: 9–10 = near-perfect PM/ops delivery role, tech or startup context
 
     let cvBase;
     try {
-      cvBase = fs.readFileSync(path.join(__dirname, 'cv-base.txt'), 'utf8').slice(0, 3000);
+      cvBase = fs.readFileSync(path.join(__dirname, 'cv-base.txt'), 'utf8').slice(0, 8000);
     } catch {
       send(res, 500, { error: 'cv-base.txt not found in ~/job-tracker/' });
       return;
