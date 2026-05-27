@@ -291,6 +291,18 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
+  // ── GET /archive.html → serve the archive page ───────────────────────────
+  if (req.method === 'GET' && pathname === '/archive.html') {
+    try {
+      const html = fs.readFileSync(path.join(__dirname, 'archive.html'));
+      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+      res.end(html);
+    } catch {
+      res.writeHead(404); res.end('archive.html not found next to server.js');
+    }
+    return;
+  }
+
   // ── GET /api/health ──────────────────────────────────────────────────────
   if (req.method === 'GET' && pathname === '/api/health') {
     send(res, 200, { ok: true, hasKey: !!API_KEY });
