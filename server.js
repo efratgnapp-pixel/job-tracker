@@ -328,6 +328,18 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
+  // ── GET /dashboard.html → serve the dashboard page ───────────────────────
+  if (req.method === 'GET' && pathname === '/dashboard.html') {
+    try {
+      const html = fs.readFileSync(path.join(__dirname, 'dashboard.html'));
+      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+      res.end(html);
+    } catch {
+      res.writeHead(404); res.end('dashboard.html not found next to server.js');
+    }
+    return;
+  }
+
   // ── GET /api/health ──────────────────────────────────────────────────────
   if (req.method === 'GET' && pathname === '/api/health') {
     send(res, 200, { ok: true, hasKey: !!API_KEY });
