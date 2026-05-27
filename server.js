@@ -1363,27 +1363,47 @@ Rules:
   res.writeHead(404); res.end('Not found');
 });
 
-try {
-  server.listen(PORT, () => {
-    console.log('');
-    console.log('  ┌─ Job Tracker proxy server ──────────────────────┐');
-    console.log(`  │  http://localhost:${PORT}/job-tracker.html         │`);
-    console.log('  └─────────────────────────────────────────────────┘');
-    if (!API_KEY) {
+async function startup() {
+  // ── Restore data from Gist if data.json is missing or empty ──────────────
+  const dataFile = path.join(__dirname, 'data.json');
+  let needsRestore = false;
+  try {
+    const content = fs.readFileSync(dataFile, 'utf8').trim();
+    if (!content || content === '{}' || content === '[]') needsRestore = true;
+  } catch {
+    // File doesn't exist at all
+    needsRestore = true;
+  }
+  if (needsRestore) {
+    console.log('[startup] data.json missing or empty — attempting Gist restore…');
+    await restoreFromGist();
+  }
+
+  // ── Start listening ───────────────────────────────────────────────────────
+  try {
+    server.listen(PORT, () => {
       console.log('');
-      console.log('  ⚠  ANTHROPIC_API_KEY is not set.');
-      console.log('     Screenshot extraction will fail until you set it:');
-      console.log('     export ANTHROPIC_API_KEY=sk-ant-...');
-      console.log('     Then restart this server.');
-    } else {
-      console.log('  ✓  ANTHROPIC_API_KEY detected — ready to extract screenshots');
-    }
-    console.log('');
-  });
-} catch (err) {
-  console.error('[startup error]', err);
-  process.exit(1);
+      console.log('  ┌─ Job Tracker proxy server ──────────────────────┐');
+      console.log(`  │  http://localhost:${PORT}/job-tracker.html         │`);
+      console.log('  └─────────────────────────────────────────────────┘');
+      if (!API_KEY) {
+        console.log('');
+        console.log('  ⚠  ANTHROPIC_API_KEY is not set.');
+        console.log('     Screenshot extraction will fail until you set it:');
+        console.log('     export ANTHROPIC_API_KEY=sk-ant-...');
+        console.log('     Then restart this server.');
+      } else {
+        console.log('  ✓  ANTHROPIC_API_KEY detected — ready to extract screenshots');
+      }
+      console.log('');
+    });
+  } catch (err) {
+    console.error('[startup error]', err);
+    process.exit(1);
+  }
 }
+
+startup();
 
 // — Gist backup helpers —
 async function backupToGist(data) {
