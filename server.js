@@ -304,6 +304,18 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
+  // ── GET /interviews.html → serve the interviews page ─────────────────────
+  if (req.method === 'GET' && pathname === '/interviews.html') {
+    try {
+      const html = fs.readFileSync(path.join(__dirname, 'interviews.html'));
+      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+      res.end(html);
+    } catch {
+      res.writeHead(404); res.end('interviews.html not found next to server.js');
+    }
+    return;
+  }
+
   // ── GET /api/health ──────────────────────────────────────────────────────
   if (req.method === 'GET' && pathname === '/api/health') {
     send(res, 200, { ok: true, hasKey: !!API_KEY });
@@ -1205,6 +1217,90 @@ Be direct and specific. Focus on the most impactful action for this week. Do not
         send(res, 500, { error: err.message });
       }
     });
+    return;
+  }
+
+  // ── POST /api/interview-prep ─────────────────────────────────────────────
+  if (req.method === 'POST' && pathname === '/api/interview-prep') {
+    if (!API_KEY) { send(res, 500, { error: 'ANTHROPIC_API_KEY is not set' }); return; }
+
+    let raw;
+    try { raw = await readBody(req); } catch { send(res, 400, { error: 'Failed to read request body' }); return; }
+    let payload;
+    try { payload = JSON.parse(raw); } catch { send(res, 400, { error: 'Request body is not valid JSON' }); return; }
+
+    const { role, company, jobDescription, rounds = [] } = payload;
+    if (!role || !company) { send(res, 400, { error: 'Request must include role and company' }); return; }
+
+    const roundsSummary = rounds.length
+      ? `\nRounds logged so far: ${rounds.map((r, i) =>
+          `Round ${i + 1}: ${r.type || 'unknown'} on ${r.dateTime ? new Date(r.dateTime).toLocaleDateString('en-GB') : 'TBD'}${r.interviewer ? ` with ${r.interviewer}` : ''}${r.interviewerRole ? ` (${r.interviewerRole})` : ''}`
+        ).join('; ')}`
+      : '';
+
+    const jdSection = jobDescription
+      ? `\nJob description:\n${jobDescription.slice(0, 3000)}`
+      : '';
+
+    const prompt = `You are an expert interview coach helping a candidate prepare for a job interview in the UK.
+
+CANDIDATE: Efrat Gnapp — Project Manager / Business Operations Manager with 5 years at HP Indigo.
+Key background: delivered 3 concurrent R&D programmes (~$40M budget), Jira org-wide implementation for 100+ users, global demand forecasting, Lean and Agile delivery, Tableau dashboards, cross-functional stakeholder management, Drupa 2024 product launches.
+
+JOB:
+Role: ${role}
+Company: ${company}${jdSection}${roundsSummary}
+
+Generate likely interview questions grouped into categories, tailored to this specific role and company. Focus on questions that assess the skills and experiences most relevant here. Include both behavioural (STAR-style) and technical/situational questions. Use British English throughout.
+
+Return ONLY a valid JSON object — no markdown, no code fences, no extra text:
+{
+  "categories": [
+    { "name": "Behavioural / STAR", "questions": ["<q1>", "<q2>", "<q3>"] },
+    { "name": "Role-specific & Technical", "questions": ["<q1>", "<q2>", "<q3>"] },
+    { "name": "Stakeholder & Delivery", "questions": ["<q1>", "<q2>"] },
+    { "name": "Culture & Motivation", "questions": ["<q1>", "<q2>"] }
+  ],
+  "tip": "<one specific, actionable prep tip for THIS role and company — not generic advice>"
+}
+
+Rules:
+- 3–4 questions per category, 4 categories
+- Questions must be specific to the role/company context, not generic
+- Frame behavioural questions using UK interview conventions (STAR, competency-based)
+- Do not repeat questions across categories`;
+
+    const reqBody = JSON.stringify({
+      model: 'claude-sonnet-4-5',
+      max_tokens: 1200,
+      messages: [{ role: 'user', content: prompt }],
+    });
+
+    try {
+      const result = await httpsPost({
+        hostname: 'api.anthropic.com',
+        path: '/v1/messages',
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': API_KEY,
+          'anthropic-version': '2023-06-01',
+          'Content-Length': Buffer.byteLength(reqBody),
+        },
+      }, reqBody);
+
+      const data = JSON.parse(result.body);
+      if (result.status !== 200) {
+        send(res, result.status, { error: data.error?.message || `Anthropic returned ${result.status}` });
+        return;
+      }
+      const text  = (data.content?.[0]?.text || '').trim();
+      const match = text.match(/\{[\s\S]*\}/);
+      if (!match) { send(res, 500, { error: 'No JSON in prep response' }); return; }
+      send(res, 200, JSON.parse(match[0]));
+    } catch (err) {
+      send(res, 502, { error: 'Could not reach Anthropic: ' + (err.message || err) });
+    }
     return;
   }
 
