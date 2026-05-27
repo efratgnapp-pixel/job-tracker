@@ -255,6 +255,28 @@
     .overdue { color: var(--rejected); font-weight: 600; }
     .due-soon { color: var(--interviewing); font-weight: 600; }
 
+    /* ── Google Calendar button ──────────────────────────── */
+    .gcal-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      margin-left: 6px;
+      padding: 2px 5px;
+      border-radius: 5px;
+      background: #f0fdf4;
+      border: 1px solid #bbf7d0;
+      color: #16a34a;
+      font-size: .72rem;
+      font-weight: 700;
+      text-decoration: none;
+      white-space: nowrap;
+      vertical-align: middle;
+      line-height: 1;
+      transition: background .12s;
+      flex-shrink: 0;
+    }
+    .gcal-btn:hover { background: #dcfce7; }
+
     .empty-state {
       text-align: center;
       padding: 64px 24px;
@@ -1038,7 +1060,8 @@
         </div>
         <div class="form-group">
           <label for="f-nextActionDate">Next Action Due Date</label>
-          <input type="date" id="f-nextActionDate" />
+          <input type="date" id="f-nextActionDate" oninput="updateModalCalLink()" />
+          <div id="modalCalLinkWrap" style="margin-top:4px;min-height:20px"></div>
         </div>
         <div class="form-group span-2">
           <label for="f-notes">Notes</label>
@@ -1563,6 +1586,23 @@
     const [y, m, day] = d.split('-');
     return `${m}/${day}/${y}`;
   }
+  function gcalUrl(dateStr, title, description) {
+    if (!dateStr) return null;
+    const [y, m, d] = dateStr.split('-');
+    const start = `${y}${m}${d}`;
+    const endD = new Date(dateStr + 'T00:00:00');
+    endD.setDate(endD.getDate() + 1);
+    const end = `${endD.getFullYear()}${String(endD.getMonth()+1).padStart(2,'0')}${String(endD.getDate()).padStart(2,'0')}`;
+    const p = new URLSearchParams({ action:'TEMPLATE', text: title, dates:`${start}/${end}`, details: description });
+    return `https://calendar.google.com/calendar/render?${p}`;
+  }
+
+  function gcalLink(dateStr, title, description) {
+    const url = gcalUrl(dateStr, title, description);
+    if (!url) return '';
+    return `<a href="${url}" target="_blank" rel="noopener" class="gcal-btn" title="Add to Google Calendar" onclick="event.stopPropagation()">📅 Cal</a>`;
+  }
+
   function dueDateClass(d) {
     if (!d) return '';
     const diff = (new Date(d) - new Date(today())) / 86400000;
@@ -1744,7 +1784,7 @@
         <td style="max-width:130px">${liCellHtml(j)}</td>
         <td style="max-width:110px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${j.referredBy ? escHtml(j.referredBy) : '<span style="color:var(--text-muted)">—</span>'}</td>
         <td style="max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${j.nextAction ? escHtml(j.nextAction) : '<span style="color:var(--text-muted)">—</span>'}</td>
-        <td class="${dueClass}" style="white-space:nowrap">${dueDateLabel(j.nextActionDate)}</td>
+        <td class="${dueClass}" style="white-space:nowrap">${dueDateLabel(j.nextActionDate)}${gcalLink(j.nextActionDate, `${j.nextAction || 'Next action'}: ${j.company} – ${j.role}`, `Next action for ${j.role} at ${j.company}${j.nextAction ? ': ' + j.nextAction : ''}.`)}</td>
         <td class="td-actions">
           ${needsFollowUp(j) ? `<button class="btn btn-followup btn-sm" onclick="logFollowUp('${j.id}')">✓ Followed Up</button>` : ''}
           <div class="row-menu">
@@ -1848,7 +1888,7 @@
         <td style="max-width:130px">${liCellHtml(j)}</td>
         <td style="max-width:110px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${j.referredBy ? escHtml(j.referredBy) : '<span style="color:var(--text-muted)">—</span>'}</td>
         <td style="max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${j.nextAction ? escHtml(j.nextAction) : '<span style="color:var(--text-muted)">—</span>'}</td>
-        <td class="${dueClass}" style="white-space:nowrap">${dueDateLabel(j.nextActionDate)}</td>
+        <td class="${dueClass}" style="white-space:nowrap">${dueDateLabel(j.nextActionDate)}${gcalLink(j.nextActionDate, `${j.nextAction || 'Next action'}: ${j.company} – ${j.role}`, `Next action for ${j.role} at ${j.company}${j.nextAction ? ': ' + j.nextAction : ''}.`)}</td>
         <td class="td-actions">
           ${needsFollowUp(j) ? `<button class="btn btn-followup btn-sm" onclick="logFollowUp('${j.id}')">✓ Followed Up</button>` : ''}
           <div class="row-menu">
@@ -2103,6 +2143,7 @@
         });
       }
     }
+    updateModalCalLink();
     _editInterviews = (id && jobs.find(j => j.id === id)?.interviews) ? [...jobs.find(j => j.id === id).interviews] : [];
     const statusSel = document.getElementById('f-status');
     statusSel.removeEventListener('change', renderInterviewSection);
@@ -2110,6 +2151,18 @@
     renderInterviewSection();
     document.getElementById('overlay').classList.add('open');
     document.getElementById('f-company').focus();
+  }
+
+  function updateModalCalLink() {
+    const dateStr  = document.getElementById('f-nextActionDate').value;
+    const action   = document.getElementById('f-nextAction').value.trim();
+    const company  = document.getElementById('f-company').value.trim();
+    const role     = document.getElementById('f-role').value.trim();
+    const wrap     = document.getElementById('modalCalLinkWrap');
+    if (!dateStr || !wrap) { if (wrap) wrap.innerHTML = ''; return; }
+    const title = `${action || 'Next action'}: ${company || 'Company'}${role ? ' – ' + role : ''}`;
+    const desc  = `Next action${action ? ': ' + action : ''} for ${role || 'role'} at ${company || 'company'}.`;
+    wrap.innerHTML = `<a href="${gcalUrl(dateStr, title, desc)}" target="_blank" rel="noopener" class="gcal-btn">📅 Add to Google Calendar</a>`;
   }
 
   function closeModal() {

@@ -403,6 +403,28 @@
     .info-loading { display: flex; align-items: center; gap: 12px; padding: 32px 16px; color: var(--text-muted); font-size: .9rem; }
     .info-error { padding: 20px; color: var(--rejected); font-size: .875rem; background: var(--rejected-bg); border-radius: var(--radius-sm); }
 
+    /* ── Google Calendar button ──────────────────────────── */
+    .gcal-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 2px 7px;
+      border-radius: 5px;
+      background: #f0fdf4;
+      border: 1px solid #bbf7d0;
+      color: #16a34a;
+      font-size: .72rem;
+      font-weight: 700;
+      text-decoration: none;
+      white-space: nowrap;
+      vertical-align: middle;
+      line-height: 1.4;
+      transition: background .12s;
+      flex-shrink: 0;
+      margin-top: 4px;
+    }
+    .gcal-btn:hover { background: #dcfce7; }
+
     /* ── Spinner ─────────────────────────────────────────── */
     @keyframes spin { to { transform: rotate(360deg); } }
     .spinner {
@@ -496,7 +518,8 @@
       </div>
       <div class="form-group span-2">
         <label>Follow-up Date</label>
-        <input type="date" id="rfFollowUp" />
+        <input type="date" id="rfFollowUp" oninput="updateRoundCalLink()" />
+        <div id="roundCalLinkWrap" style="min-height:22px"></div>
       </div>
       <div class="form-group span-2">
         <label>Notes</label>
@@ -757,6 +780,7 @@
   }
 
   function renderRound(jobId, r, idx, total) {
+    const job = allJobs.find(j => j.id === jobId) || {};
     const interviewer = [r.interviewer, r.interviewerRole].filter(Boolean).join(', ');
     return `
     <div class="round-item">
@@ -769,6 +793,7 @@
         </div>
         ${r.notes ? `<div class="round-notes-text">${esc(r.notes)}</div>` : ''}
         ${followupBadge(r.followUp)}
+        ${r.followUp ? '<a href="' + gcalUrl(r.followUp, 'Follow-up: ' + job.company + ' – ' + job.role, 'Follow up on ' + (r.type || 'interview') + (r.interviewer ? ' with ' + r.interviewer : '') + ' for ' + job.role + ' at ' + job.company + '.') + '" target="_blank" rel="noopener" class="gcal-btn" onclick="event.stopPropagation()">📅 Add to Calendar</a>' : ''}
       </div>
       <div class="round-actions">
         <button class="btn-icon" title="Edit round" onclick="openEditRound('${esc(jobId)}', ${idx})">
@@ -779,6 +804,33 @@
         </button>
       </div>
     </div>`;
+  }
+
+  // ── Google Calendar helper ────────────────────────────────────────────────
+  function gcalUrl(dateStr, title, description) {
+    if (!dateStr) return null;
+    const [y, m, d] = dateStr.split('-');
+    const start = `${y}${m}${d}`;
+    const endD = new Date(dateStr + 'T00:00:00');
+    endD.setDate(endD.getDate() + 1);
+    const end = `${endD.getFullYear()}${String(endD.getMonth()+1).padStart(2,'0')}${String(endD.getDate()).padStart(2,'0')}`;
+    const p = new URLSearchParams({ action:'TEMPLATE', text: title, dates:`${start}/${end}`, details: description });
+    return `https://calendar.google.com/calendar/render?${p}`;
+  }
+
+  function updateRoundCalLink() {
+    const dateStr    = document.getElementById('rfFollowUp').value;
+    const wrap       = document.getElementById('roundCalLinkWrap');
+    if (!wrap) return;
+    if (!dateStr) { wrap.innerHTML = ''; return; }
+    const job        = allJobs.find(j => j.id === _roundJobId);
+    const company    = job?.company || 'Company';
+    const role       = job?.role    || 'Role';
+    const interviewer = document.getElementById('rfInterviewer').value.trim();
+    const type       = document.getElementById('rfType').value;
+    const title      = `Follow-up: ${company} – ${role}`;
+    const desc       = `Follow up on ${type} interview${interviewer ? ' with ' + interviewer : ''} for ${role} at ${company}.`;
+    wrap.innerHTML = `<a href="${gcalUrl(dateStr, title, desc)}" target="_blank" rel="noopener" class="gcal-btn">📅 Add to Google Calendar</a>`;
   }
 
   // ── round modal ───────────────────────────────────────────────────────────
@@ -798,6 +850,7 @@
     document.getElementById('rfInterviewerRole').value= '';
     document.getElementById('rfFollowUp').value       = '';
     document.getElementById('rfNotes').value          = '';
+    updateRoundCalLink();
     document.getElementById('roundOverlay').classList.add('open');
   }
 
@@ -816,6 +869,7 @@
     document.getElementById('rfInterviewerRole').value = r.interviewerRole || '';
     document.getElementById('rfFollowUp').value        = r.followUp || '';
     document.getElementById('rfNotes').value           = r.notes || '';
+    updateRoundCalLink();
     document.getElementById('roundOverlay').classList.add('open');
   }
 
