@@ -44,6 +44,12 @@ function getSession(req) {
   return true;
 }
 
+// Add Secure flag when running behind HTTPS proxy (Render, etc.)
+function cookieFlags(req) {
+  const https = req.headers['x-forwarded-proto'] === 'https';
+  return `HttpOnly; SameSite=Lax; Path=/${https ? '; Secure' : ''}`;
+}
+
 process.on('uncaughtException', err => {
   console.error('[uncaughtException]', err);
   process.exit(1);
@@ -333,7 +339,7 @@ const server = http.createServer(async (req, res) => {
       const token = crypto.randomBytes(32).toString('hex');
       sessions.set(token, Date.now() + 7 * 24 * 60 * 60 * 1000);
       res.writeHead(302, {
-        'Set-Cookie': `session=${token}; HttpOnly; SameSite=Lax; Path=/; Max-Age=${7 * 24 * 60 * 60}`,
+        'Set-Cookie': `session=${token}; Max-Age=${7 * 24 * 60 * 60}; ${cookieFlags(req)}`,
         Location: '/',
       });
       res.end();
@@ -346,7 +352,7 @@ const server = http.createServer(async (req, res) => {
     const token = parseCookies(req.headers.cookie)['session'];
     if (token) sessions.delete(token);
     res.writeHead(302, {
-      'Set-Cookie': 'session=; HttpOnly; SameSite=Lax; Path=/; Max-Age=0',
+      'Set-Cookie': `session=; Max-Age=0; ${cookieFlags(req)}`,
       Location: '/login.html',
     });
     res.end();
@@ -1479,14 +1485,15 @@ async function startup() {
       console.log('  ┌─ Job Tracker proxy server ──────────────────────┐');
       console.log(`  │  http://localhost:${PORT}/job-tracker.html         │`);
       console.log('  └─────────────────────────────────────────────────┘');
-      if (!API_KEY) {
-        console.log('');
-        console.log('  ⚠  ANTHROPIC_API_KEY is not set.');
-        console.log('     Screenshot extraction will fail until you set it:');
-        console.log('     export ANTHROPIC_API_KEY=sk-ant-...');
-        console.log('     Then restart this server.');
+      if (PASSWORD) {
+        console.log('  ✓  PASSWORD set — auth enabled');
       } else {
-        console.log('  ✓  ANTHROPIC_API_KEY detected — ready to extract screenshots');
+        console.log('  ⚠  PASSWORD not set — all login attempts will fail');
+      }
+      if (!API_KEY) {
+        console.log('  ⚠  ANTHROPIC_API_KEY is not set — screenshot extraction disabled');
+      } else {
+        console.log('  ✓  ANTHROPIC_API_KEY detected');
       }
       console.log('');
     });
