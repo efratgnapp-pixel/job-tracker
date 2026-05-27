@@ -13,6 +13,7 @@ const { Document, Packer, Paragraph, TextRun, AlignmentType, BorderStyle } = req
 const PORT    = process.env.PORT || 3001;
 const HTML    = path.join(__dirname, 'job-tracker.html');
 const API_KEY = process.env.ANTHROPIC_API_KEY;
+const GIST_ID = process.env.GIST_ID;
 
 process.on('uncaughtException', err => {
   console.error('[uncaughtException]', err);
@@ -1211,7 +1212,12 @@ Be direct and specific. Focus on the most impactful action for this week. Do not
   if (req.method === 'GET' && pathname === '/api/data') {
     const file = path.join(__dirname, 'data.json');
     try {
-      const raw = fs.readFileSync(file, 'utf8');
+      let raw = fs.readFileSync(file, 'utf8');
+      const trimmed = raw.trim();
+      if (!trimmed || trimmed === '{}' || trimmed === '[]') {
+        await restoreFromGist();
+        try { raw = fs.readFileSync(file, 'utf8'); } catch { raw = '{}'; }
+      }
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(raw);
     } catch {
@@ -1229,6 +1235,7 @@ Be direct and specific. Focus on the most impactful action for this week. Do not
       try {
         JSON.parse(body); // validate
         fs.writeFileSync(path.join(__dirname, 'data.json'), body);
+        backupToGist(body);
         send(res, 200, { ok: true });
       } catch (err) {
         send(res, 400, { error: err.message });
@@ -1260,4 +1267,52 @@ try {
 } catch (err) {
   console.error('[startup error]', err);
   process.exit(1);
+}
+
+// — Gist backup helpers —
+async function backupToGist(data) {
+  try {
+    const token = process.env.GITHUB_TOKEN;
+    const gistId = process.env.GIST_ID;
+    if (!token || !gistId) return;
+    const https = require('https');
+    const payload = JSON.stringify({ files: { 'data.json': { content: data } } });
+    await new Promise((resolve, reject) => {
+      const req = https.request(`https://api.github.com/gists/${gistId}`, {
+        method: 'PATCH',
+        headers: { 'Authorization': `token ${token}`, 'Content-Type': 'application/json', 'User-Agent': 'job-tracker' }
+      }, res => { res.resume(); resolve(); });
+      req.on('error', reject);
+      req.write(payload);
+      req.end();
+    });
+    console.log('[gist] backup ok');
+  } catch (e) { console.error('[gist] backup failed', e.message); }
+}
+
+async function restoreFromGist() {
+  try {
+    const token = process.env.GITHUB_TOKEN;
+    const gistId = process.env.GIST_ID;
+    if (!token || !gistId) return;
+    const https = require('https');
+    const data = await new Promise((resolve, reject) => {
+      const req = https.request(`https://api.github.com/gists/${gistId}`, {
+        headers: { 'Authorization': `token ${token}`, 'User-Agent': 'job-tracker' }
+      }, res => {
+        let body = '';
+        res.on('data', d => body += d);
+        res.on('end', () => {
+          try {
+            const gist = JSON.parse(body);
+            resolve(gist.files['data.json'].content);
+          } catch(e) { reject(e); }
+        });
+      });
+      req.on('error', reject);
+      req.end();
+    });
+    fs.writeFileSync(path.join(__dirname, 'data.json'), data);
+    console.log('[gist] restored from backup');
+  } catch (e) { console.error('[gist] restore failed', e.message); }
 }
