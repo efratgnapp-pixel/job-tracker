@@ -10,6 +10,7 @@ server.log
 
 # User data
 feedback.json
+data.json
 
 # Claude Code project files
 .claude/

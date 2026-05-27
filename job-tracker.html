@@ -891,6 +891,7 @@
 <header>
   <h1>Job Search <span>Tracker</span></h1>
   <div style="display:flex;gap:10px;align-items:center;flex-shrink:0">
+    <span id="syncIndicator" style="font-size:.75rem;font-weight:600;letter-spacing:.2px;white-space:nowrap;color:#6b7280">● Offline</span>
     <div class="row-menu">
       <button class="btn btn-ghost" onclick="toggleImportMenu(event)">
         <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
@@ -1477,12 +1478,61 @@
   const STATUSES = ['Applied', 'Considering', 'Interviewing', 'Offer', 'Rejected'];
 
   // ── Persistence ─────────────────────────────────────────
-  function load() {
+  function setSyncStatus(status) {
+    const el = document.getElementById('syncIndicator');
+    if (!el) return;
+    if (status === 'synced') {
+      el.textContent = '● Synced';
+      el.style.color = '#16a34a';
+    } else if (status === 'saving') {
+      el.textContent = '● Saving…';
+      el.style.color = '#d97706';
+    } else {
+      el.textContent = '● Offline';
+      el.style.color = '#6b7280';
+    }
+  }
+
+  async function load() {
+    // Try server first
+    try {
+      const res = await fetch('/api/data');
+      if (res.ok) {
+        const data = await res.json();
+        // data.json stores {jobTrackerData_v1: [...]}
+        jobs = data[STORAGE_KEY] || [];
+        // Keep localStorage in sync as cache
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(jobs));
+        setSyncStatus('synced');
+        return;
+      }
+    } catch {}
+    // Fallback to localStorage
     try { jobs = JSON.parse(localStorage.getItem(STORAGE_KEY)) || []; }
     catch { jobs = []; }
+    setSyncStatus('offline');
   }
+
+  let _saveTimer = null;
   function save() {
+    // Always write localStorage immediately
+    const payload = { [STORAGE_KEY]: jobs };
     localStorage.setItem(STORAGE_KEY, JSON.stringify(jobs));
+    // Debounce server writes by 400 ms to batch rapid changes
+    clearTimeout(_saveTimer);
+    setSyncStatus('saving');
+    _saveTimer = setTimeout(async () => {
+      try {
+        const res = await fetch('/api/data', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+        setSyncStatus(res.ok ? 'synced' : 'offline');
+      } catch {
+        setSyncStatus('offline');
+      }
+    }, 400);
   }
 
   // ── ID ──────────────────────────────────────────────────
@@ -4230,9 +4280,8 @@
   }
 
   // ── Boot ─────────────────────────────────────────────────
-  load();
   loadLiConnections();
-  render();
+  load().then(() => render());
 </script>
 </body>
 </html>

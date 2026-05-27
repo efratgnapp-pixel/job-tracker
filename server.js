@@ -1207,6 +1207,36 @@ Be direct and specific. Focus on the most impactful action for this week. Do not
     return;
   }
 
+  // ── GET /api/data → return saved jobs ────────────────────────────────────
+  if (req.method === 'GET' && pathname === '/api/data') {
+    const file = path.join(__dirname, 'data.json');
+    try {
+      const raw = fs.readFileSync(file, 'utf8');
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(raw);
+    } catch {
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end('{}');
+    }
+    return;
+  }
+
+  // ── POST /api/data → save jobs ────────────────────────────────────────────
+  if (req.method === 'POST' && pathname === '/api/data') {
+    let body = '';
+    req.on('data', d => body += d);
+    req.on('end', () => {
+      try {
+        JSON.parse(body); // validate
+        fs.writeFileSync(path.join(__dirname, 'data.json'), body);
+        send(res, 200, { ok: true });
+      } catch (err) {
+        send(res, 400, { error: err.message });
+      }
+    });
+    return;
+  }
+
   res.writeHead(404); res.end('Not found');
 });
 
