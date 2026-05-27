@@ -1500,7 +1500,7 @@
       if (res.ok) {
         const data = await res.json();
         // data.json stores {jobTrackerData_v1: [...]}
-        jobs = data[STORAGE_KEY] || [];
+        jobs = Array.isArray(data) ? data : (data[STORAGE_KEY] || Object.values(data));
         // Keep localStorage in sync as cache
         localStorage.setItem(STORAGE_KEY, JSON.stringify(jobs));
         setSyncStatus('synced');
