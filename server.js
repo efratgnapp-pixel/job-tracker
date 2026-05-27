@@ -304,6 +304,18 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
+  // ── GET /rejections.html → serve the rejections page ────────────────────
+  if (req.method === 'GET' && pathname === '/rejections.html') {
+    try {
+      const html = fs.readFileSync(path.join(__dirname, 'rejections.html'));
+      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+      res.end(html);
+    } catch {
+      res.writeHead(404); res.end('rejections.html not found next to server.js');
+    }
+    return;
+  }
+
   // ── GET /interviews.html → serve the interviews page ─────────────────────
   if (req.method === 'GET' && pathname === '/interviews.html') {
     try {

@@ -1,0 +1,827 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Rejection Analysis – Job Tracker</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #f0f2f7;
+      --surface: #ffffff;
+      --surface2: #f8f9fc;
+      --border: #e2e6f0;
+      --text: #1a1d2e;
+      --text-muted: #6b7280;
+      --accent: #4f46e5;
+      --accent-light: #ede9fe;
+      --accent-hover: #4338ca;
+      --rejected: #ef4444;
+      --rejected-bg: #fef2f2;
+      --rejected-border: #fecaca;
+      --offer: #10b981;
+      --offer-bg: #ecfdf5;
+      --interviewing: #f59e0b;
+      --interviewing-bg: #fffbeb;
+      --radius: 12px;
+      --radius-sm: 8px;
+      --shadow: 0 1px 3px rgba(0,0,0,.08), 0 4px 12px rgba(0,0,0,.05);
+      --shadow-lg: 0 4px 20px rgba(0,0,0,.12);
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      padding: 24px 16px 60px;
+    }
+
+    /* ── Header ──────────────────────────────────────────── */
+    header {
+      max-width: 1200px;
+      margin: 0 auto 28px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+    header h1 { font-size: 1.6rem; font-weight: 700; letter-spacing: -.4px; }
+    header h1 span { color: var(--rejected); }
+
+    /* ── Buttons ─────────────────────────────────────────── */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 9px 18px;
+      font-family: inherit;
+      font-size: .875rem;
+      font-weight: 600;
+      border: none;
+      border-radius: var(--radius-sm);
+      cursor: pointer;
+      text-decoration: none;
+      white-space: nowrap;
+      transition: background .15s, transform .1s;
+    }
+    .btn:active { transform: scale(.97); }
+    .btn-ghost { background: var(--surface); color: var(--text-muted); border: 1.5px solid var(--border); }
+    .btn-ghost:hover { background: var(--surface2); color: var(--text); }
+    .btn-ai { background: #f5f3ff; color: var(--accent); border: 1.5px solid #c4b5fd; }
+    .btn-ai:hover { background: var(--accent-light); }
+
+    /* ── Stats summary row ───────────────────────────────── */
+    .summary-grid {
+      max-width: 1200px;
+      margin: 0 auto 28px;
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+      gap: 14px;
+    }
+    .summary-card {
+      background: var(--surface);
+      border-radius: var(--radius);
+      padding: 18px 20px;
+      box-shadow: var(--shadow);
+      border-left: 4px solid var(--rejected);
+    }
+    .summary-card .sc-value {
+      font-size: 2rem;
+      font-weight: 800;
+      color: var(--rejected);
+      line-height: 1;
+      margin-bottom: 4px;
+    }
+    .summary-card .sc-label {
+      font-size: .75rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: .5px;
+      color: var(--text-muted);
+    }
+    .summary-card.neutral { border-left-color: var(--accent); }
+    .summary-card.neutral .sc-value { color: var(--accent); }
+    .summary-card.warn { border-left-color: var(--interviewing); }
+    .summary-card.warn .sc-value { color: var(--interviewing); font-size: 1.25rem; }
+
+    /* ── AI Insight banner ───────────────────────────────── */
+    .insight-wrap {
+      max-width: 1200px;
+      margin: 0 auto 28px;
+    }
+    .insight-card {
+      background: var(--surface);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding: 20px 24px;
+      display: flex;
+      align-items: flex-start;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+    .insight-body { flex: 1; min-width: 200px; }
+    .insight-label {
+      font-size: .7rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: .5px;
+      color: var(--accent);
+      margin-bottom: 6px;
+    }
+    .insight-text {
+      font-size: .9rem;
+      line-height: 1.65;
+      color: var(--text);
+    }
+    .insight-text.muted { color: var(--text-muted); font-style: italic; }
+    .insight-loading { display: flex; align-items: center; gap: 10px; color: var(--text-muted); font-size: .875rem; }
+
+    /* ── Charts grid ─────────────────────────────────────── */
+    .charts-grid {
+      max-width: 1200px;
+      margin: 0 auto 28px;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 18px;
+    }
+    @media (max-width: 720px) { .charts-grid { grid-template-columns: 1fr; } }
+
+    .chart-card {
+      background: var(--surface);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding: 22px 24px;
+    }
+    .chart-title {
+      font-size: .78rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: .5px;
+      color: var(--text-muted);
+      margin-bottom: 18px;
+    }
+
+    /* ── Bar chart rows ──────────────────────────────────── */
+    .bar-list { display: flex; flex-direction: column; gap: 12px; }
+    .bar-row { display: flex; flex-direction: column; gap: 5px; }
+    .bar-meta {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+    }
+    .bar-label {
+      font-size: .855rem;
+      font-weight: 500;
+      color: var(--text);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      max-width: 65%;
+    }
+    .bar-count {
+      font-size: .78rem;
+      font-weight: 700;
+      color: var(--text-muted);
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+    .bar-track {
+      width: 100%;
+      height: 8px;
+      background: var(--surface2);
+      border-radius: 99px;
+      overflow: hidden;
+    }
+    .bar-fill {
+      height: 100%;
+      border-radius: 99px;
+      transition: width .4s ease;
+    }
+    .bar-fill.red    { background: var(--rejected); }
+    .bar-fill.amber  { background: var(--interviewing); }
+    .bar-fill.purple { background: var(--accent); }
+    .bar-fill.teal   { background: var(--offer); }
+    .bar-fill.blue   { background: #3b82f6; }
+
+    .bar-pct {
+      font-size: .72rem;
+      color: var(--text-muted);
+      margin-top: 1px;
+    }
+
+    .chart-empty {
+      font-size: .855rem;
+      color: var(--text-muted);
+      font-style: italic;
+      padding: 8px 0;
+    }
+
+    /* ── Table card ──────────────────────────────────────── */
+    .table-card {
+      max-width: 1200px;
+      margin: 0 auto;
+      background: var(--surface);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      overflow: hidden;
+    }
+    .table-card-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 14px 20px;
+      border-bottom: 1.5px solid var(--border);
+      background: var(--surface2);
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+    .table-card-header h2 {
+      font-size: .78rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: .5px;
+      color: var(--text-muted);
+    }
+    .table-wrap { overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; font-size: .855rem; }
+    thead th {
+      background: var(--surface2);
+      padding: 11px 14px;
+      text-align: left;
+      font-size: .73rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: .5px;
+      color: var(--text-muted);
+      border-bottom: 1.5px solid var(--border);
+      white-space: nowrap;
+      cursor: pointer;
+      user-select: none;
+    }
+    thead th:hover { color: var(--text); }
+    tbody tr { border-bottom: 1px solid var(--border); transition: background .1s; }
+    tbody tr:last-child { border-bottom: none; }
+    tbody tr:hover { background: var(--surface2); }
+    tbody td { padding: 11px 14px; vertical-align: middle; }
+    .td-company { font-weight: 600; }
+    .td-role { max-width: 220px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+    /* ── Stage badge ─────────────────────────────────────── */
+    .stage-badge {
+      display: inline-flex;
+      align-items: center;
+      padding: 2px 9px;
+      border-radius: 20px;
+      font-size: .72rem;
+      font-weight: 600;
+      white-space: nowrap;
+    }
+    .stage-no-response  { background: #f3f4f6; color: #6b7280; }
+    .stage-cv-screen    { background: #fef3c7; color: #92400e; }
+    .stage-phone-screen { background: #fffbeb; color: #b45309; }
+    .stage-interview    { background: #ede9fe; color: #6d28d9; }
+    .stage-withdrew     { background: #ecfdf5; color: #065f46; }
+    .stage-other        { background: var(--surface2); color: var(--text-muted); }
+
+    /* ── Days chip ───────────────────────────────────────── */
+    .days-chip {
+      display: inline-flex;
+      padding: 2px 8px;
+      border-radius: 6px;
+      font-size: .78rem;
+      font-weight: 700;
+      background: var(--surface2);
+      color: var(--text-muted);
+      white-space: nowrap;
+    }
+    .days-chip.fast  { background: #fef2f2; color: var(--rejected); }
+    .days-chip.slow  { background: #f0fdf4; color: #16a34a; }
+
+    /* ── Empty state ─────────────────────────────────────── */
+    .empty-state {
+      text-align: center;
+      padding: 64px 24px;
+      color: var(--text-muted);
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+    .empty-state svg { margin: 0 auto 16px; opacity: .3; }
+    .empty-state p { font-size: 1rem; font-weight: 600; margin-bottom: 6px; }
+    .empty-state small { font-size: .875rem; }
+
+    .table-footer {
+      padding: 11px 16px;
+      border-top: 1px solid var(--border);
+      font-size: .8rem;
+      color: var(--text-muted);
+      background: var(--surface2);
+    }
+
+    /* ── Spinner ─────────────────────────────────────────── */
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .spinner {
+      width: 15px; height: 15px;
+      border: 2px solid currentColor;
+      border-top-color: transparent;
+      border-radius: 50%;
+      animation: spin .7s linear infinite;
+      flex-shrink: 0;
+      opacity: .6;
+    }
+
+    /* ── Modal ───────────────────────────────────────────── */
+    .overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(15,15,30,.45);
+      backdrop-filter: blur(3px);
+      z-index: 100;
+      align-items: flex-start;
+      justify-content: center;
+      padding: 40px 16px;
+      overflow-y: auto;
+    }
+    .overlay.open { display: flex; }
+    .modal {
+      background: var(--surface);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow-lg);
+      width: 100%;
+      max-width: 600px;
+      padding: 32px;
+      position: relative;
+      animation: slideUp .2s ease;
+    }
+    @keyframes slideUp {
+      from { opacity: 0; transform: translateY(16px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    .modal-header {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      margin-bottom: 20px;
+      gap: 12px;
+    }
+    .modal-header h2 { font-size: 1.15rem; font-weight: 700; }
+    .modal-header .modal-sub { font-size: .82rem; color: var(--text-muted); margin-top: 3px; }
+    .close-btn {
+      background: none; border: none; cursor: pointer;
+      color: var(--text-muted); padding: 4px; border-radius: 6px;
+      display: flex; flex-shrink: 0;
+    }
+    .close-btn:hover { background: var(--surface2); color: var(--text); }
+    .modal-footer {
+      display: flex;
+      justify-content: flex-end;
+      gap: 10px;
+      margin-top: 24px;
+      padding-top: 20px;
+      border-top: 1px solid var(--border);
+    }
+    .insight-modal-text {
+      font-size: .92rem;
+      line-height: 1.7;
+      color: var(--text);
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-left: 3px solid var(--accent);
+      border-radius: var(--radius-sm);
+      padding: 16px 18px;
+    }
+    .insight-modal-error {
+      background: var(--rejected-bg);
+      color: var(--rejected);
+      border: 1px solid var(--rejected-border);
+      border-radius: var(--radius-sm);
+      padding: 12px 16px;
+      font-size: .875rem;
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>Rejection <span>Analysis</span></h1>
+  <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+    <button class="btn btn-ai" id="insightBtn" onclick="openInsightModal()">
+      <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+      AI Insights
+    </button>
+    <a href="/job-tracker.html" class="btn btn-ghost">
+      <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg>
+      Back to Tracker
+    </a>
+  </div>
+</header>
+
+<div id="summaryGrid" class="summary-grid" style="display:none"></div>
+
+<div id="chartsGrid" class="charts-grid" style="display:none"></div>
+
+<div id="tableSection" style="display:none">
+  <div class="table-card">
+    <div class="table-card-header">
+      <h2 id="tableHeading">All Rejections</h2>
+      <input type="search" id="searchInput" placeholder="Filter by company or role…"
+        style="font-family:inherit;font-size:.825rem;padding:6px 10px;border:1.5px solid var(--border);border-radius:var(--radius-sm);background:var(--surface);color:var(--text);outline:none;width:220px"
+        oninput="filterTable()" />
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th onclick="sortBy('company')">Company <span id="sort-company"></span></th>
+            <th onclick="sortBy('role')">Role <span id="sort-role"></span></th>
+            <th onclick="sortBy('dateApplied')">Applied <span id="sort-dateApplied"></span></th>
+            <th onclick="sortBy('days')">Days to Rejection <span id="sort-days"></span></th>
+            <th onclick="sortBy('stage')">Stage <span id="sort-stage"></span></th>
+          </tr>
+        </thead>
+        <tbody id="rejTable"></tbody>
+      </table>
+    </div>
+    <div class="table-footer" id="tableFooter"></div>
+  </div>
+</div>
+
+<div class="empty-state" id="emptyState" style="display:none">
+  <svg width="52" height="52" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24" style="display:block">
+    <circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/>
+  </svg>
+  <p>No rejections recorded</p>
+  <small>Jobs you mark as Rejected will appear here</small>
+</div>
+
+<!-- AI Insight modal -->
+<div class="overlay" id="insightOverlay">
+  <div class="modal">
+    <div class="modal-header">
+      <div>
+        <h2>AI Insights</h2>
+        <div class="modal-sub">Actionable patterns from your rejections</div>
+      </div>
+      <button class="close-btn" onclick="closeInsightModal()">
+        <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+    <div id="insightModalBody"></div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeInsightModal()">Close</button>
+      <button class="btn btn-ai" id="insightRegenBtn" onclick="fetchInsight(true)" style="display:none">
+        <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+        Regenerate
+      </button>
+    </div>
+  </div>
+</div>
+
+<script>
+  // ── helpers ──────────────────────────────────────────────────────────────
+  function esc(s) {
+    return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+  function fmtDate(d) {
+    if (!d) return '—';
+    const [y,m,day] = d.split('-');
+    return `${day}/${m}/${y}`;
+  }
+  function daysBetween(a, b) {
+    if (!a) return null;
+    const ms = new Date(b || new Date()) - new Date(a);
+    return Math.max(0, Math.round(ms / 86400000));
+  }
+
+  const STAGE_LABELS = {
+    no_response:  'No response',
+    cv_screen:    'CV screening',
+    phone_screen: 'Phone screen',
+    interview:    'After interview',
+    withdrew:     'Withdrew',
+    other:        'Other',
+  };
+  const STAGE_CLASS = {
+    no_response:  'stage-no-response',
+    cv_screen:    'stage-cv-screen',
+    phone_screen: 'stage-phone-screen',
+    interview:    'stage-interview',
+    withdrew:     'stage-withdrew',
+    other:        'stage-other',
+  };
+
+  function stageLabel(j) {
+    if (j.rejectionReason && j.rejectionReason !== '_no_reason') {
+      return STAGE_LABELS[j.rejectionReason] || j.rejectionReason;
+    }
+    // infer from interviews array
+    if (j.interviews?.length) return 'After interview';
+    return 'No response / unknown';
+  }
+  function stageKey(j) {
+    if (j.rejectionReason && j.rejectionReason !== '_no_reason') return j.rejectionReason;
+    if (j.interviews?.length) return 'interview';
+    return 'no_response';
+  }
+
+  // ── data ──────────────────────────────────────────────────────────────────
+  let rejected = [];
+  let _sortField = 'dateApplied';
+  let _sortDir   = 'desc';
+  let _filter    = '';
+  let _cachedInsight = null;
+
+  async function loadData() {
+    try {
+      const r   = await fetch('/api/data');
+      const raw = await r.json();
+      let all = [];
+      if (Array.isArray(raw))               all = raw;
+      else if (Array.isArray(raw.jobs))     all = raw.jobs;
+      else                                  all = Object.values(raw).find(Array.isArray) || [];
+      rejected = all.filter(j => j.status === 'Rejected');
+    } catch { rejected = []; }
+    render();
+  }
+
+  // ── render ────────────────────────────────────────────────────────────────
+  function render() {
+    if (rejected.length === 0) {
+      document.getElementById('emptyState').style.display   = '';
+      document.getElementById('summaryGrid').style.display  = 'none';
+      document.getElementById('chartsGrid').style.display   = 'none';
+      document.getElementById('tableSection').style.display = 'none';
+      document.getElementById('insightBtn').style.display   = 'none';
+      return;
+    }
+    document.getElementById('emptyState').style.display   = 'none';
+    document.getElementById('summaryGrid').style.display  = '';
+    document.getElementById('chartsGrid').style.display   = '';
+    document.getElementById('tableSection').style.display = '';
+    document.getElementById('insightBtn').style.display   = '';
+
+    renderSummary();
+    renderCharts();
+    renderTable();
+  }
+
+  // ── Summary cards ─────────────────────────────────────────────────────────
+  function renderSummary() {
+    const total = rejected.length;
+
+    // avg days to rejection
+    const withDays = rejected.filter(j => j.dateApplied);
+    const avgDays  = withDays.length
+      ? Math.round(withDays.reduce((s,j) => s + daysBetween(j.dateApplied), 0) / withDays.length)
+      : null;
+
+    // most common stage
+    const stageCounts = {};
+    rejected.forEach(j => { const k = stageKey(j); stageCounts[k] = (stageCounts[k]||0)+1; });
+    const topStageKey = Object.entries(stageCounts).sort((a,b)=>b[1]-a[1])[0]?.[0];
+    const topStageLabel = STAGE_LABELS[topStageKey] || 'Unknown';
+
+    // response rate (got any response at all)
+    const responded = rejected.filter(j => j.rejectionReason && j.rejectionReason !== 'no_response' && j.rejectionReason !== '_no_reason').length;
+    const responseRate = Math.round((responded / total) * 100);
+
+    document.getElementById('summaryGrid').innerHTML = `
+      <div class="summary-card">
+        <div class="sc-value">${total}</div>
+        <div class="sc-label">Total Rejections</div>
+      </div>
+      <div class="summary-card neutral">
+        <div class="sc-value">${avgDays !== null ? avgDays + 'd' : '—'}</div>
+        <div class="sc-label">Avg Days to Rejection</div>
+      </div>
+      <div class="summary-card warn">
+        <div class="sc-value">${topStageLabel}</div>
+        <div class="sc-label">Most Common Stage</div>
+      </div>
+      <div class="summary-card neutral">
+        <div class="sc-value">${responseRate}%</div>
+        <div class="sc-label">Got a Response</div>
+      </div>
+    `;
+  }
+
+  // ── Charts ────────────────────────────────────────────────────────────────
+  function barList(items, colorClass) {
+    if (!items.length) return `<div class="chart-empty">Not enough data yet.</div>`;
+    const max = items[0][1];
+    return `<div class="bar-list">${items.map(([label, count]) => {
+      const pct = Math.round((count / max) * 100);
+      const share = Math.round((count / rejected.length) * 100);
+      return `<div class="bar-row">
+        <div class="bar-meta">
+          <span class="bar-label" title="${esc(label)}">${esc(label)}</span>
+          <span class="bar-count">${count} (${share}%)</span>
+        </div>
+        <div class="bar-track"><div class="bar-fill ${colorClass}" style="width:${pct}%"></div></div>
+      </div>`;
+    }).join('')}</div>`;
+  }
+
+  function renderCharts() {
+    // 1. Stage at rejection
+    const stageCounts = {};
+    rejected.forEach(j => { const k = stageKey(j); stageCounts[k] = (stageCounts[k]||0)+1; });
+    const stageItems = Object.entries(stageCounts)
+      .map(([k,v]) => [STAGE_LABELS[k] || k, v])
+      .sort((a,b) => b[1]-a[1]);
+
+    // 2. Role type patterns
+    const roleCounts = {};
+    rejected.forEach(j => {
+      if (!j.role) return;
+      // normalise: strip seniority prefixes, take first 3 meaningful words
+      const key = j.role.trim()
+        .replace(/^(senior|junior|lead|principal|head of|vp of|director of)\s+/i,'')
+        .split(/\s+/).slice(0,3).join(' ');
+      roleCounts[key] = (roleCounts[key]||0)+1;
+    });
+    const roleItems = Object.entries(roleCounts).sort((a,b)=>b[1]-a[1]).slice(0,6);
+
+    // 3. Company type patterns
+    const typeCounts = { 'Startup / Scale-up': 0, 'Corporate / Enterprise': 0, 'Agency / Consultancy': 0, 'Other': 0 };
+    const startupHints   = /startup|scale.?up|seed|series [a-c]|tech|ai|saas|app|platform|software/i;
+    const corporateHints = /ltd|plc|group|global|international|holdings|bank|finance|insurance|pharma/i;
+    const agencyHints    = /agency|consult|recruit|staffing|digital|creative|media|marketing/i;
+    rejected.forEach(j => {
+      const haystack = ((j.company||'') + ' ' + (j.notes||'')).toLowerCase();
+      if      (agencyHints.test(haystack))    typeCounts['Agency / Consultancy']++;
+      else if (corporateHints.test(haystack)) typeCounts['Corporate / Enterprise']++;
+      else if (startupHints.test(haystack))   typeCounts['Startup / Scale-up']++;
+      else                                    typeCounts['Other']++;
+    });
+    const typeItems = Object.entries(typeCounts).filter(([,v])=>v>0).sort((a,b)=>b[1]-a[1]);
+
+    // 4. Time to rejection buckets
+    const buckets = { '<1 week': 0, '1–2 weeks': 0, '2–4 weeks': 0, '4+ weeks': 0, 'Unknown': 0 };
+    rejected.forEach(j => {
+      const d = daysBetween(j.dateApplied);
+      if (d === null)  buckets['Unknown']++;
+      else if (d < 7)  buckets['<1 week']++;
+      else if (d < 14) buckets['1–2 weeks']++;
+      else if (d < 28) buckets['2–4 weeks']++;
+      else             buckets['4+ weeks']++;
+    });
+    const timeItems = Object.entries(buckets).filter(([,v])=>v>0).sort((a,b)=>b[1]-a[1]);
+
+    document.getElementById('chartsGrid').innerHTML = `
+      <div class="chart-card">
+        <div class="chart-title">Stage Rejected At</div>
+        ${barList(stageItems, 'red')}
+      </div>
+      <div class="chart-card">
+        <div class="chart-title">Time to Rejection</div>
+        ${barList(timeItems, 'amber')}
+      </div>
+      <div class="chart-card">
+        <div class="chart-title">Role Type Patterns</div>
+        ${barList(roleItems.length ? roleItems : [], 'purple')}
+      </div>
+      <div class="chart-card">
+        <div class="chart-title">Company Type Patterns</div>
+        ${barList(typeItems, 'teal')}
+      </div>
+    `;
+  }
+
+  // ── Table ─────────────────────────────────────────────────────────────────
+  function filterTable() {
+    _filter = document.getElementById('searchInput').value.toLowerCase();
+    renderTable();
+  }
+
+  function sortBy(field) {
+    if (_sortField === field) _sortDir = _sortDir === 'asc' ? 'desc' : 'asc';
+    else { _sortField = field; _sortDir = field === 'dateApplied' ? 'desc' : 'asc'; }
+    renderTable();
+  }
+
+  function renderTable() {
+    // Update sort indicators
+    ['company','role','dateApplied','days','stage'].forEach(f => {
+      const el = document.getElementById('sort-'+f);
+      if (el) el.textContent = _sortField===f ? (_sortDir==='asc'?'↑':'↓') : '';
+    });
+
+    let rows = rejected.map(j => ({
+      ...j,
+      _days:  daysBetween(j.dateApplied),
+      _stage: stageKey(j),
+      _stageLabel: stageLabel(j),
+    }));
+
+    if (_filter) {
+      rows = rows.filter(j =>
+        (j.company||'').toLowerCase().includes(_filter) ||
+        (j.role||'').toLowerCase().includes(_filter)
+      );
+    }
+
+    rows.sort((a, b) => {
+      let av, bv;
+      if (_sortField === 'days')        { av = a._days ?? 9999; bv = b._days ?? 9999; }
+      else if (_sortField === 'stage')  { av = a._stageLabel;   bv = b._stageLabel;   }
+      else                              { av = a[_sortField]||''; bv = b[_sortField]||''; }
+      if (av < bv) return _sortDir === 'asc' ? -1 : 1;
+      if (av > bv) return _sortDir === 'asc' ?  1 : -1;
+      return 0;
+    });
+
+    const tbody = document.getElementById('rejTable');
+    tbody.innerHTML = rows.map(j => {
+      const daysVal = j._days;
+      const daysChipClass = daysVal === null ? '' : daysVal < 7 ? 'fast' : daysVal > 21 ? 'slow' : '';
+      const daysText = daysVal !== null ? `${daysVal}d` : '—';
+      const stageCls = STAGE_CLASS[j._stage] || 'stage-other';
+      return `<tr>
+        <td class="td-company">${esc(j.company)}</td>
+        <td class="td-role" title="${esc(j.role)}">${esc(j.role)}</td>
+        <td style="white-space:nowrap">${fmtDate(j.dateApplied)}</td>
+        <td><span class="days-chip ${daysChipClass}">${esc(daysText)}</span></td>
+        <td><span class="stage-badge ${stageCls}">${esc(j._stageLabel)}</span></td>
+      </tr>`;
+    }).join('');
+
+    const total = rejected.length;
+    const shown = rows.length;
+    document.getElementById('tableHeading').textContent = `All Rejections`;
+    document.getElementById('tableFooter').textContent  =
+      _filter ? `Showing ${shown} of ${total}` : `${total} rejection${total !== 1 ? 's' : ''}`;
+  }
+
+  // ── AI Insight modal ──────────────────────────────────────────────────────
+  function openInsightModal() {
+    document.getElementById('insightOverlay').classList.add('open');
+    if (_cachedInsight) {
+      showInsightResult(_cachedInsight);
+    } else {
+      fetchInsight(false);
+    }
+  }
+
+  function closeInsightModal() {
+    document.getElementById('insightOverlay').classList.remove('open');
+  }
+
+  async function fetchInsight(regen) {
+    if (regen) _cachedInsight = null;
+    const bodyEl   = document.getElementById('insightModalBody');
+    const regenBtn = document.getElementById('insightRegenBtn');
+    regenBtn.style.display = 'none';
+    bodyEl.innerHTML = `<div class="insight-loading"><span class="spinner"></span> Analysing patterns…</div>`;
+
+    // build rejCounts from all rejected jobs
+    const rejCounts = {};
+    rejected.forEach(j => {
+      const k = j.rejectionReason || '_no_reason';
+      rejCounts[k] = (rejCounts[k]||0)+1;
+    });
+
+    try {
+      const res = await fetch('/api/rejection-insight', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ rejCounts, total: rejected.length }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+      _cachedInsight = data.insight;
+      showInsightResult(data.insight);
+    } catch (err) {
+      bodyEl.innerHTML = `<div class="insight-modal-error">⚠ ${esc(err.message)}</div>`;
+    }
+    regenBtn.style.display = '';
+  }
+
+  function showInsightResult(text) {
+    const bodyEl = document.getElementById('insightModalBody');
+    const regenBtn = document.getElementById('insightRegenBtn');
+    if (!text) {
+      bodyEl.innerHTML = `<p style="color:var(--text-muted);font-size:.875rem">No insight available — add rejection reasons to your rejected jobs for better analysis.</p>`;
+    } else {
+      bodyEl.innerHTML = `<div class="insight-modal-text">${esc(text)}</div>`;
+    }
+    regenBtn.style.display = '';
+  }
+
+  // ── backdrop / escape ─────────────────────────────────────────────────────
+  document.getElementById('insightOverlay').addEventListener('click', function(e) {
+    if (e.target === this) closeInsightModal();
+  });
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') closeInsightModal();
+  });
+
+  // ── init ──────────────────────────────────────────────────────────────────
+  loadData();
+</script>
+</body>
+</html>
