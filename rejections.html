@@ -535,16 +535,36 @@
   let _filter    = '';
   let _cachedInsight = null;
 
+  const STORAGE_KEY = 'jobTrackerData_v1';
+
+  function parseJobs(raw) {
+    if (Array.isArray(raw))                              return raw;
+    if (raw && Array.isArray(raw[STORAGE_KEY]))          return raw[STORAGE_KEY];
+    if (raw && Array.isArray(raw.jobs))                  return raw.jobs;
+    if (raw && typeof raw === 'object') {
+      const found = Object.values(raw).find(Array.isArray);
+      if (found) return found;
+    }
+    return [];
+  }
+
+  function localJobs() {
+    try { return JSON.parse(localStorage.getItem(STORAGE_KEY)) || []; }
+    catch { return []; }
+  }
+
   async function loadData() {
     try {
       const r   = await fetch('/api/data');
       const raw = await r.json();
-      let all = [];
-      if (Array.isArray(raw))               all = raw;
-      else if (Array.isArray(raw.jobs))     all = raw.jobs;
-      else                                  all = Object.values(raw).find(Array.isArray) || [];
+      let all   = parseJobs(raw);
+      // Server returned empty — fall back to localStorage (jobs live there on Render's ephemeral FS)
+      if (all.length === 0) all = localJobs();
       rejected = all.filter(j => j.status === 'Rejected');
-    } catch { rejected = []; }
+    } catch {
+      // Network error — use localStorage cache
+      rejected = localJobs().filter(j => j.status === 'Rejected');
+    }
     render();
   }
 

@@ -1329,8 +1329,16 @@ Rules:
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(raw);
     } catch {
-      res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end('{}');
+      // data.json missing entirely — attempt Gist restore before giving up
+      try {
+        await restoreFromGist();
+        const restored = fs.readFileSync(file, 'utf8');
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(restored);
+      } catch {
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end('{}');
+      }
     }
     return;
   }
