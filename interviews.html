@@ -373,6 +373,36 @@
     }
     .prep-tip strong { font-weight: 700; }
 
+    /* ── Salary modal ───────────────────────────────────── */
+    .salary-modal { max-width: 560px; }
+    .salary-bands { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; margin-bottom: 20px; }
+    .salary-band { text-align: center; padding: 16px 8px 14px; border-radius: var(--radius); border: 1px solid var(--border); background: var(--surface2); }
+    .salary-band .band-label { font-size: .7rem; font-weight: 700; text-transform: uppercase; letter-spacing: .5px; color: var(--text-muted); margin-bottom: 8px; }
+    .salary-band .band-amount { font-size: 1.45rem; font-weight: 800; color: var(--text); line-height: 1; }
+    .salary-band.band-mid { background: var(--accent); border-color: var(--accent); }
+    .salary-band.band-mid .band-label,
+    .salary-band.band-mid .band-amount { color: #fff; }
+    .salary-meta { font-size: .845rem; color: var(--text); line-height: 1.55; margin-bottom: 14px; }
+    .salary-seniority { display: inline-block; font-size: .75rem; font-weight: 600; padding: 3px 10px; border-radius: 20px; background: #ede9fe; color: #4f46e5; border: 1px solid #c4b5fd; margin-bottom: 12px; }
+    .salary-sources { margin-top: 16px; }
+    .salary-sources h4 { font-size: .72rem; font-weight: 700; text-transform: uppercase; letter-spacing: .5px; color: var(--text-muted); margin-bottom: 8px; }
+    .salary-sources ul { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 5px; }
+    .salary-sources li { font-size: .8rem; color: var(--text-muted); padding-left: 14px; position: relative; line-height: 1.4; }
+    .salary-sources li::before { content: '·'; position: absolute; left: 4px; color: var(--accent); font-weight: 700; }
+
+    /* ── Research modal ──────────────────────────────────── */
+    .research-modal { max-width: 720px; }
+    .research-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+    .research-card { background: var(--surface2); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 14px 16px; }
+    .research-card.research-card-full { grid-column: 1 / -1; }
+    .research-card h4 { font-size: .7rem; font-weight: 700; text-transform: uppercase; letter-spacing: .5px; color: var(--text-muted); margin: 0 0 8px; }
+    .research-card p { font-size: .855rem; color: var(--text); line-height: 1.6; margin: 0; }
+    .research-fit { background: #f0fdf4; border-color: #bbf7d0; }
+    .research-fit h4 { color: #16a34a; }
+    .research-fit p { color: #166534; }
+    .info-loading { display: flex; align-items: center; gap: 12px; padding: 32px 16px; color: var(--text-muted); font-size: .9rem; }
+    .info-error { padding: 20px; color: var(--rejected); font-size: .875rem; background: var(--rejected-bg); border-radius: var(--radius-sm); }
+
     /* ── Spinner ─────────────────────────────────────────── */
     @keyframes spin { to { transform: rotate(360deg); } }
     .spinner {
@@ -498,6 +528,52 @@
       <button class="btn btn-ai" id="prepRegenBtn" onclick="runPrep()" style="display:none">
         <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
         Regenerate
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Salary Modal ──────────────────────────────────────── -->
+<div class="overlay" id="salaryOverlay">
+  <div class="modal salary-modal">
+    <div class="modal-header">
+      <div>
+        <h2>Salary Intelligence</h2>
+        <p id="salaryModalSub" style="font-size:.8rem;color:var(--text-muted);margin-top:2px"></p>
+      </div>
+      <button class="close-btn" onclick="closeSalaryModal()" title="Close">
+        <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+    <div id="salaryBody" style="padding:4px 0 8px;overflow-y:auto"></div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeSalaryModal()">Close</button>
+      <button class="btn btn-ghost" id="salaryRefreshBtn" onclick="refreshSalary()" style="display:none">
+        <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+        Refresh
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Company Research Modal ────────────────────────────── -->
+<div class="overlay" id="researchOverlay">
+  <div class="modal research-modal">
+    <div class="modal-header">
+      <div>
+        <h2>Company Research</h2>
+        <p id="researchModalSub" style="font-size:.8rem;color:var(--text-muted);margin-top:2px"></p>
+      </div>
+      <button class="close-btn" onclick="closeResearchModal()" title="Close">
+        <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+    <div id="researchBody" style="padding:4px 0 8px;overflow-y:auto"></div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeResearchModal()">Close</button>
+      <button class="btn btn-ghost" id="researchRefreshBtn" onclick="refreshResearch()" style="display:none">
+        <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+        Refresh
       </button>
     </div>
   </div>
@@ -656,6 +732,14 @@
           ${rounds.length > 0 ? `<span class="badge" style="background:#f5f3ff;color:#7e22ce;border:1px solid #e9d5ff">${rounds.length} round${rounds.length !== 1 ? 's' : ''}</span>` : ''}
         </div>
         <div class="job-card-actions">
+          <button class="btn btn-ghost btn-sm" onclick="openSalaryModal('${esc(job.id)}')">
+            <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+            Salary
+          </button>
+          <button class="btn btn-ghost btn-sm" onclick="openResearchModal('${esc(job.id)}')">
+            <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            Research
+          </button>
           <button class="btn btn-ai btn-sm" onclick="openPrep('${esc(job.id)}')">
             <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
             AI Prep
@@ -866,6 +950,158 @@
     bodyEl.innerHTML = html || `<div class="prep-error">No questions returned. Try regenerating.</div>`;
   }
 
+  // ── Salary ────────────────────────────────────────────────────────────────
+  let _salaryJobId = null;
+
+  function openSalaryModal(id) {
+    const j = allJobs.find(jj => jj.id === id);
+    if (!j) return;
+    _salaryJobId = id;
+    document.getElementById('salaryModalSub').textContent = `${j.role} · ${j.company}`;
+    document.getElementById('salaryRefreshBtn').style.display = 'none';
+    if (j.salaryData) {
+      document.getElementById('salaryBody').innerHTML = renderSalaryResult(j.salaryData);
+      document.getElementById('salaryRefreshBtn').style.display = '';
+    } else {
+      document.getElementById('salaryBody').innerHTML =
+        `<div class="info-loading"><span class="spinner"></span>Searching for salary benchmarks…</div>`;
+      fetchSalary(j);
+    }
+    document.getElementById('salaryOverlay').classList.add('open');
+  }
+
+  function closeSalaryModal() {
+    document.getElementById('salaryOverlay').classList.remove('open');
+    _salaryJobId = null;
+  }
+
+  function refreshSalary() {
+    if (!_salaryJobId) return;
+    const j = allJobs.find(jj => jj.id === _salaryJobId);
+    if (!j) return;
+    delete j.salaryData;
+    saveData();
+    document.getElementById('salaryBody').innerHTML =
+      `<div class="info-loading"><span class="spinner"></span>Searching for salary benchmarks…</div>`;
+    document.getElementById('salaryRefreshBtn').style.display = 'none';
+    fetchSalary(j);
+  }
+
+  async function fetchSalary(j) {
+    try {
+      const res = await fetch('/api/salary', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ role: j.role, company: j.company, jobDescription: j.jobDescription || '' }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || `Server error ${res.status}`);
+      const target = allJobs.find(jj => jj.id === j.id);
+      if (target) { target.salaryData = data; saveData(); }
+      if (_salaryJobId === j.id) {
+        document.getElementById('salaryBody').innerHTML = renderSalaryResult(data);
+        document.getElementById('salaryRefreshBtn').style.display = '';
+      }
+    } catch (err) {
+      if (_salaryJobId === j.id) {
+        document.getElementById('salaryBody').innerHTML =
+          `<div class="info-error">${esc(err.message || 'Unknown error')}</div>`;
+      }
+    }
+  }
+
+  function fmtSalary(n) {
+    if (!n) return '—';
+    return `£${Math.round(n / 1000)}k`;
+  }
+
+  function renderSalaryResult(d) {
+    const sources = (d.sources || []).map(s => `<li>${esc(s)}</li>`).join('');
+    return `
+      <div class="salary-bands">
+        <div class="salary-band"><div class="band-label">Low</div><div class="band-amount">${fmtSalary(d.low)}</div></div>
+        <div class="salary-band band-mid"><div class="band-label">Typical Mid</div><div class="band-amount">${fmtSalary(d.mid)}</div></div>
+        <div class="salary-band"><div class="band-label">High</div><div class="band-amount">${fmtSalary(d.high)}</div></div>
+      </div>
+      ${d.seniority ? `<span class="salary-seniority">${esc(d.seniority)}</span>` : ''}
+      ${d.context   ? `<p class="salary-meta">${esc(d.context)}</p>` : ''}
+      ${sources     ? `<div class="salary-sources"><h4>Sources &amp; data points</h4><ul>${sources}</ul></div>` : ''}
+    `;
+  }
+
+  // ── Company Research ──────────────────────────────────────────────────────
+  let _researchJobId = null;
+
+  function openResearchModal(id) {
+    const j = allJobs.find(jj => jj.id === id);
+    if (!j) return;
+    _researchJobId = id;
+    document.getElementById('researchModalSub').textContent = j.company;
+    document.getElementById('researchRefreshBtn').style.display = 'none';
+    if (j.companyResearch) {
+      document.getElementById('researchBody').innerHTML = renderResearchResult(j.companyResearch);
+      document.getElementById('researchRefreshBtn').style.display = '';
+    } else {
+      document.getElementById('researchBody').innerHTML =
+        `<div class="info-loading"><span class="spinner"></span>Researching ${esc(j.company)}…</div>`;
+      fetchCompanyResearch(j);
+    }
+    document.getElementById('researchOverlay').classList.add('open');
+  }
+
+  function closeResearchModal() {
+    document.getElementById('researchOverlay').classList.remove('open');
+    _researchJobId = null;
+  }
+
+  function refreshResearch() {
+    if (!_researchJobId) return;
+    const j = allJobs.find(jj => jj.id === _researchJobId);
+    if (!j) return;
+    delete j.companyResearch;
+    saveData();
+    document.getElementById('researchBody').innerHTML =
+      `<div class="info-loading"><span class="spinner"></span>Researching ${esc(j.company)}…</div>`;
+    document.getElementById('researchRefreshBtn').style.display = 'none';
+    fetchCompanyResearch(j);
+  }
+
+  async function fetchCompanyResearch(j) {
+    try {
+      const res = await fetch('/api/company-research', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ role: j.role, company: j.company }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || `Server error ${res.status}`);
+      const target = allJobs.find(jj => jj.id === j.id);
+      if (target) { target.companyResearch = data; saveData(); }
+      if (_researchJobId === j.id) {
+        document.getElementById('researchBody').innerHTML = renderResearchResult(data);
+        document.getElementById('researchRefreshBtn').style.display = '';
+      }
+    } catch (err) {
+      if (_researchJobId === j.id) {
+        document.getElementById('researchBody').innerHTML =
+          `<div class="info-error">${esc(err.message || 'Unknown error')}</div>`;
+      }
+    }
+  }
+
+  function renderResearchResult(d) {
+    const card = (title, text, extra) =>
+      text ? `<div class="research-card${extra ? ' '+extra : ''}"><h4>${title}</h4><p>${esc(text)}</p></div>` : '';
+    return `<div class="research-grid">
+      ${card('What they do',              d.what_they_do,    'research-card-full')}
+      ${card('Size &amp; stage',          d.size_stage)}
+      ${card('London presence',           d.london_presence)}
+      ${card('Recent news',               d.recent_news,     'research-card-full')}
+      ${card('Culture &amp; work style',  d.culture,         'research-card-full')}
+      ${card('Why it could be a good fit',d.fit_for_efrat,   'research-card-full research-fit')}
+    </div>`;
+  }
+
   // ── close overlay on backdrop click ──────────────────────────────────────
   document.getElementById('roundOverlay').addEventListener('click', function(e) {
     if (e.target === this) closeRoundModal();
@@ -873,12 +1109,20 @@
   document.getElementById('prepOverlay').addEventListener('click', function(e) {
     if (e.target === this) closePrepModal();
   });
+  document.getElementById('salaryOverlay').addEventListener('click', function(e) {
+    if (e.target === this) closeSalaryModal();
+  });
+  document.getElementById('researchOverlay').addEventListener('click', function(e) {
+    if (e.target === this) closeResearchModal();
+  });
 
   // ── keyboard Escape ───────────────────────────────────────────────────────
   document.addEventListener('keydown', e => {
     if (e.key !== 'Escape') return;
-    if (document.getElementById('roundOverlay').classList.contains('open')) { closeRoundModal(); return; }
-    if (document.getElementById('prepOverlay').classList.contains('open'))  { closePrepModal();  return; }
+    if (document.getElementById('roundOverlay').classList.contains('open'))   { closeRoundModal();   return; }
+    if (document.getElementById('prepOverlay').classList.contains('open'))    { closePrepModal();    return; }
+    if (document.getElementById('salaryOverlay').classList.contains('open'))  { closeSalaryModal();  return; }
+    if (document.getElementById('researchOverlay').classList.contains('open')){ closeResearchModal(); return; }
   });
 
   // ── init ──────────────────────────────────────────────────────────────────
