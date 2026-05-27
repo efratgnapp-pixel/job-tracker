@@ -9,11 +9,40 @@ const fs    = require('fs');
 const path  = require('path');
 
 const { Document, Packer, Paragraph, TextRun, AlignmentType, BorderStyle } = require('docx');
+const crypto = require('crypto');
 
 const PORT    = process.env.PORT || 3001;
 const HTML    = path.join(__dirname, 'job-tracker.html');
 const API_KEY = process.env.ANTHROPIC_API_KEY;
 const GIST_ID = process.env.GIST_ID;
+
+const PASSWORD = process.env.PASSWORD;
+
+// ── Session store ─────────────────────────────────────────────────────────────
+const sessions = new Map(); // token → expiry timestamp
+
+setInterval(() => {
+  const now = Date.now();
+  for (const [k, v] of sessions) if (now > v) sessions.delete(k);
+}, 3_600_000);
+
+function parseCookies(header) {
+  const out = {};
+  if (!header) return out;
+  header.split(';').forEach(p => {
+    const [k, ...v] = p.trim().split('=');
+    out[k.trim()] = v.join('=').trim();
+  });
+  return out;
+}
+
+function getSession(req) {
+  const token   = parseCookies(req.headers.cookie)['session'];
+  if (!token) return false;
+  const expires = sessions.get(token);
+  if (!expires || Date.now() > expires) { sessions.delete(token); return false; }
+  return true;
+}
 
 process.on('uncaughtException', err => {
   console.error('[uncaughtException]', err);
@@ -279,6 +308,58 @@ const server = http.createServer(async (req, res) => {
 
   const url      = new URL(req.url, `http://localhost:${PORT}`);
   const pathname = url.pathname;
+
+  // ── GET /login.html (public) ─────────────────────────────────────────────
+  if (req.method === 'GET' && pathname === '/login.html') {
+    try {
+      const html = fs.readFileSync(path.join(__dirname, 'login.html'));
+      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+      res.end(html);
+    } catch {
+      res.writeHead(404); res.end('login.html not found');
+    }
+    return;
+  }
+
+  // ── POST /auth/login ─────────────────────────────────────────────────────
+  if (req.method === 'POST' && pathname === '/auth/login') {
+    let body = '';
+    req.on('data', d => body += d);
+    req.on('end', () => {
+      const pw = new URLSearchParams(body).get('password') || '';
+      if (!PASSWORD || pw !== PASSWORD) {
+        res.writeHead(302, { Location: '/login.html?error=1' }); res.end(); return;
+      }
+      const token = crypto.randomBytes(32).toString('hex');
+      sessions.set(token, Date.now() + 7 * 24 * 60 * 60 * 1000);
+      res.writeHead(302, {
+        'Set-Cookie': `session=${token}; HttpOnly; SameSite=Lax; Path=/; Max-Age=${7 * 24 * 60 * 60}`,
+        Location: '/',
+      });
+      res.end();
+    });
+    return;
+  }
+
+  // ── GET /auth/logout ─────────────────────────────────────────────────────
+  if (req.method === 'GET' && pathname === '/auth/logout') {
+    const token = parseCookies(req.headers.cookie)['session'];
+    if (token) sessions.delete(token);
+    res.writeHead(302, {
+      'Set-Cookie': 'session=; HttpOnly; SameSite=Lax; Path=/; Max-Age=0',
+      Location: '/login.html',
+    });
+    res.end();
+    return;
+  }
+
+  // ── Auth guard — all routes below require a valid session ─────────────────
+  if (!getSession(req)) {
+    if (pathname.startsWith('/api/')) {
+      send(res, 401, { error: 'Unauthorized' }); return;
+    }
+    res.writeHead(302, { Location: '/login.html' }); res.end(); return;
+  }
 
   // ── GET / or /job-tracker.html → serve the app ──────────────────────────
   if (req.method === 'GET' && (pathname === '/' || pathname === '/job-tracker.html')) {

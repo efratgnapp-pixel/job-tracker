@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Sign in — Job Search Tracker</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #f0f2f7;
+      --surface: #ffffff;
+      --border: #e2e6f0;
+      --text: #1a1d2e;
+      --text-muted: #6b7280;
+      --accent: #4f46e5;
+      --accent-hover: #4338ca;
+      --shadow-lg: 0 4px 20px rgba(0,0,0,.12);
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+    }
+
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      box-shadow: var(--shadow-lg);
+      padding: 52px 44px 44px;
+      width: 100%;
+      max-width: 380px;
+      text-align: center;
+    }
+
+    .logo {
+      font-size: 1.55rem;
+      font-weight: 700;
+      letter-spacing: -.4px;
+      margin-bottom: 8px;
+    }
+    .logo span { color: var(--accent); }
+
+    .subtitle {
+      color: var(--text-muted);
+      font-size: .875rem;
+      margin-bottom: 36px;
+    }
+
+    label {
+      display: block;
+      text-align: left;
+      font-size: .825rem;
+      font-weight: 600;
+      color: var(--text-muted);
+      margin-bottom: 6px;
+      letter-spacing: .3px;
+      text-transform: uppercase;
+    }
+
+    input[type="password"] {
+      width: 100%;
+      padding: 11px 14px;
+      border: 1.5px solid var(--border);
+      border-radius: 8px;
+      font-family: inherit;
+      font-size: .95rem;
+      color: var(--text);
+      background: var(--surface);
+      outline: none;
+      transition: border-color .15s;
+      margin-bottom: 16px;
+    }
+    input[type="password"]:focus { border-color: var(--accent); }
+
+    button[type="submit"] {
+      width: 100%;
+      padding: 12px;
+      background: var(--accent);
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      font-family: inherit;
+      font-size: .95rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background .15s;
+    }
+    button[type="submit"]:hover { background: var(--accent-hover); }
+    button[type="submit"]:active { transform: scale(.98); }
+
+    .error {
+      display: none;
+      margin-bottom: 16px;
+      padding: 10px 14px;
+      background: #fef2f2;
+      border: 1px solid #fecaca;
+      border-radius: 8px;
+      color: #dc2626;
+      font-size: .85rem;
+      text-align: left;
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="logo">Job Search <span>Tracker</span></div>
+    <p class="subtitle">Enter your password to continue</p>
+
+    <form method="POST" action="/auth/login">
+      <div id="error" class="error">Incorrect password. Please try again.</div>
+      <label for="pw">Password</label>
+      <input type="password" id="pw" name="password" autofocus autocomplete="current-password" required />
+      <button type="submit">Sign in</button>
+    </form>
+  </div>
+
+  <script>
+    if (new URLSearchParams(location.search).get('error')) {
+      document.getElementById('error').style.display = 'block';
+    }
+  </script>
+</body>
+</html>
