@@ -348,74 +348,50 @@ function send(res, status, obj) {
   res.end(body);
 }
 
-// ── Parse Indeed MCP text response (field-per-line markdown format) ────────
-function parseIndeedMCPResponse(text) {
-  const jobs = [];
-  // Split on job boundaries — each block starts with **Job Title:**
-  const blocks = text.split(/(?=\*\*Job Title:\*\*)/g).filter(b => b.includes('**Job Title:**'));
-  for (const block of blocks) {
-    const get = field => {
-      const m = new RegExp(`\\*\\*${field}:\\*\\*\\s*(.+?)(?:\\n|$)`).exec(block);
-      return (m?.[1] || '').trim();
-    };
-    const title  = get('Job Title');
-    const comp   = get('Company');
-    const loc    = get('Location');
-    const posted = get('Posted on');
-    const comp2  = get('Compensation');
-    const url    = get('View Job URL');
-    if (!title) continue;
-    const key = (url || title + comp).slice(0, 40);
-    jobs.push({
-      id: `indeed-mcp-${Buffer.from(key).toString('base64url').slice(0, 12)}`,
-      title, company: comp || 'Unknown',
-      location: loc || 'London',
-      salary: /^N\/A$/i.test(comp2) ? '' : comp2,
-      url, posted, description: '', source: 'indeed',
+// ── Call JSearch via RapidAPI ───────────────────────────────────────────────
+async function searchIndeedViaJSearch() {
+  const JSEARCH_KEY = process.env.JSEARCH_API_KEY;
+  if (!JSEARCH_KEY) throw new Error('JSEARCH_API_KEY not set');
+
+  const queries = ['Project Manager London', 'Business Operations Manager London'];
+  const allJobs = [];
+  const seenIds = new Set();
+
+  for (const query of queries) {
+    const params = new URLSearchParams({ query, page: '1', num_pages: '1', date_posted: 'month', country: 'gb' });
+    const result = await new Promise((resolve, reject) => {
+      const req = https.request({
+        hostname: 'jsearch.p.rapidapi.com',
+        path: `/search?${params}`,
+        method: 'GET',
+        headers: { 'X-RapidAPI-Key': JSEARCH_KEY, 'X-RapidAPI-Host': 'jsearch.p.rapidapi.com' },
+      }, res => {
+        const chunks = [];
+        res.on('data', c => chunks.push(c));
+        res.on('end', () => resolve({ status: res.statusCode, body: Buffer.concat(chunks).toString('utf8') }));
+      });
+      req.on('error', reject);
+      req.end();
     });
+    if (result.status !== 200) { console.error('[jsearch] status', result.status); continue; }
+    const data = JSON.parse(result.body);
+    for (const job of (data.data || [])) {
+      const id = `jsearch-${Buffer.from((job.job_id || job.job_title + job.employer_name).slice(0, 40)).toString('base64url').slice(0, 14)}`;
+      if (seenIds.has(id)) continue;
+      seenIds.add(id);
+      const loc = (job.job_city || job.job_state || '').toLowerCase();
+      if (job.job_country !== 'GB' && !loc.includes('london') && !job.job_is_remote) continue;
+      allJobs.push({
+        id, title: job.job_title || 'Unknown', company: job.employer_name || 'Unknown',
+        location: [job.job_city, job.job_state].filter(Boolean).join(', ') || 'London',
+        salary: job.job_min_salary ? `£${job.job_min_salary.toLocaleString()}${job.job_max_salary ? ` – £${job.job_max_salary.toLocaleString()}` : ''}` : '',
+        url: job.job_apply_link || job.job_google_link || '',
+        posted: job.job_posted_at_datetime_utc ? new Date(job.job_posted_at_datetime_utc).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : '',
+        description: (job.job_description || '').slice(0, 600), source: 'indeed',
+      });
+    }
   }
-  return jobs;
-}
-
-// ── Call Indeed MCP via Anthropic API (mcp_servers beta) ───────────────────
-async function searchIndeedViaMCP() {
-  const reqBody = JSON.stringify({
-    model: 'claude-haiku-4-5-20251001',
-    max_tokens: 4096,
-    mcp_servers: [{
-      type: 'url',
-      url: 'https://indeed.mcp.claude.com/sse',
-      name: 'Indeed',
-      authorization_token: API_KEY,
-    }],
-    messages: [{
-      role: 'user',
-      content: 'Use the search_jobs tool to search for "Project Manager OR Business Operations Manager" jobs in London, country_code GB. Return all results.',
-    }],
-  });
-
-  const result = await httpsPost({
-    hostname: 'api.anthropic.com',
-    path: '/v1/messages',
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'x-api-key': API_KEY,
-      'anthropic-version': '2023-06-01',
-      'anthropic-beta': 'mcp-client-2025-04-04',
-      'Content-Length': Buffer.byteLength(reqBody),
-    },
-  }, reqBody);
-
-  if (result.status !== 200) {
-    const errBody = JSON.parse(result.body);
-    throw new Error(errBody.error?.message || `API returned ${result.status}`);
-  }
-
-  const data = JSON.parse(result.body);
-  // Collect text from all content blocks (Claude's final answer after tool use)
-  const text = (data.content || []).filter(b => b.type === 'text').map(b => b.text).join('\n').trim();
-  return parseIndeedMCPResponse(text);
+  return allJobs;
 }
 
 // ── Indeed RSS parser ──────────────────────────────────────────────────────
@@ -515,7 +491,7 @@ Score guide: 9-10=perfect PM/ops delivery tech role London; 7-8=strong; 5-6=part
 async function autoImport() {
   console.log('[auto-import] starting…');
   try {
-    const jobs = await searchIndeedViaMCP();
+    const jobs = await searchIndeedViaJSearch();
     const dataFile = path.join(__dirname, 'data.json');
     let existing = [];
     try { existing = JSON.parse(fs.readFileSync(dataFile, 'utf8')); } catch {}
@@ -803,9 +779,8 @@ const server = http.createServer(async (req, res) => {
 
   // ── GET /api/search-indeed ────────────────────────────────────────────────
   if (req.method === 'GET' && pathname === '/api/search-indeed') {
-    if (!API_KEY) { send(res, 500, { error: 'ANTHROPIC_API_KEY not set' }); return; }
     try {
-      const jobs = await searchIndeedViaMCP();
+      const jobs = await searchIndeedViaJSearch();
       send(res, 200, { jobs });
     } catch (err) {
       console.error('[search-indeed]', err.message);
