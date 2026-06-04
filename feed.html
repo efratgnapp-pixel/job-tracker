@@ -1,0 +1,618 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Job Feed – Job Tracker</title>
+  <link rel="manifest" href="/manifest.json" />
+  <meta name="theme-color" content="#6366f1" />
+  <link rel="apple-touch-icon" href="/icon-192.png" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #f0f2f7;
+      --surface: #ffffff;
+      --surface2: #f8f9fc;
+      --border: #e2e6f0;
+      --text: #1a1d2e;
+      --text-muted: #6b7280;
+      --accent: #4f46e5;
+      --accent-light: #ede9fe;
+      --accent-hover: #4338ca;
+      --radius: 12px;
+      --radius-sm: 8px;
+      --shadow: 0 1px 3px rgba(0,0,0,.08), 0 4px 12px rgba(0,0,0,.05);
+      --shadow-lg: 0 4px 20px rgba(0,0,0,.12);
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      padding: 24px 16px 60px;
+    }
+
+    /* ── Header ─────────────────────────────────────────────────────────── */
+    header {
+      max-width: 1400px;
+      margin: 0 auto 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+    header h1 { font-size: 1.6rem; font-weight: 700; letter-spacing: -.4px; }
+    header h1 span { color: var(--accent); }
+    .header-right { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+
+    /* ── Buttons ─────────────────────────────────────────────────────────── */
+    .btn {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 9px 18px;
+      font-family: inherit; font-size: .875rem; font-weight: 600;
+      border: none; border-radius: var(--radius-sm); cursor: pointer;
+      text-decoration: none; white-space: nowrap;
+      transition: background .15s, transform .1s, box-shadow .15s;
+    }
+    .btn:active { transform: scale(.97); }
+    .btn-primary { background: var(--accent); color: #fff; box-shadow: 0 2px 8px rgba(79,70,229,.3); }
+    .btn-primary:hover { background: var(--accent-hover); }
+    .btn-ghost { background: var(--surface); color: var(--text-muted); border: 1.5px solid var(--border); }
+    .btn-ghost:hover { background: var(--surface2); color: var(--text); }
+    .btn-sm { padding: 6px 14px; font-size: .8rem; }
+    .btn:disabled { opacity: .55; pointer-events: none; }
+
+    /* ── Auto-import banner ──────────────────────────────────────────────── */
+    .ai-banner {
+      max-width: 1400px; margin: 0 auto 20px;
+      padding: 12px 18px; border-radius: var(--radius-sm);
+      font-size: .875rem; font-weight: 500;
+      display: flex; align-items: center; gap: 10px;
+    }
+    .ai-banner.loading  { background: var(--accent-light); color: var(--accent); border: 1px solid #c4b5fd; }
+    .ai-banner.success  { background: #ecfdf5; color: #065f46; border: 1px solid #6ee7b7; }
+    .ai-banner.error    { background: #fef2f2; color: #991b1b; border: 1px solid #fecaca; }
+
+    /* ── Section ─────────────────────────────────────────────────────────── */
+    .section {
+      max-width: 1400px; margin: 0 auto 48px;
+    }
+    .section-head {
+      display: flex; align-items: center; gap: 12px;
+      margin-bottom: 16px; flex-wrap: wrap;
+    }
+    .section-head h2 { font-size: 1.15rem; font-weight: 700; }
+    .section-head .count {
+      font-size: .78rem; font-weight: 600; color: var(--text-muted);
+      background: var(--surface2); border: 1px solid var(--border);
+      padding: 2px 10px; border-radius: 20px;
+    }
+    .section-hint { font-size: .8rem; color: var(--text-muted); margin-bottom: 16px; }
+
+    /* ── LinkedIn search bar ─────────────────────────────────────────────── */
+    .li-search {
+      display: flex; gap: 10px; margin-bottom: 16px; flex-wrap: wrap;
+    }
+    .li-search input {
+      flex: 1; min-width: 260px;
+      font-family: inherit; font-size: .875rem;
+      padding: 9px 14px; border: 1.5px solid var(--border);
+      border-radius: var(--radius-sm); background: var(--surface);
+      color: var(--text); outline: none;
+      transition: border-color .15s, box-shadow .15s;
+    }
+    .li-search input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(79,70,229,.12); }
+    .li-search input::placeholder { color: var(--text-muted); }
+
+    /* ── Job grid ────────────────────────────────────────────────────────── */
+    .job-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+      gap: 16px;
+    }
+
+    /* ── Job card ────────────────────────────────────────────────────────── */
+    .job-card {
+      background: var(--surface); border-radius: var(--radius);
+      box-shadow: var(--shadow); padding: 18px 20px;
+      display: flex; flex-direction: column; gap: 12px;
+      transition: box-shadow .15s, opacity .3s, transform .3s;
+      position: relative;
+    }
+    .job-card:hover { box-shadow: var(--shadow-lg); }
+    .job-card.card-dup { opacity: .6; }
+    .job-card.card-gone { opacity: 0; transform: scale(.95); pointer-events: none; }
+
+    .card-top {
+      display: flex; align-items: flex-start; gap: 12px;
+    }
+    .company-avatar {
+      width: 40px; height: 40px; border-radius: 10px;
+      background: var(--accent-light); color: var(--accent);
+      font-size: 1.1rem; font-weight: 800;
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0;
+    }
+    .card-info { flex: 1; min-width: 0; }
+    .card-title {
+      font-size: .95rem; font-weight: 700;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .card-company { font-size: .82rem; color: var(--text-muted); margin-top: 2px; }
+
+    /* ── Score badge ─────────────────────────────────────────────────────── */
+    .score-badge {
+      flex-shrink: 0; width: 46px; height: 46px; border-radius: 10px;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      font-size: .65rem; font-weight: 700; text-transform: uppercase; letter-spacing: .3px;
+      gap: 1px;
+    }
+    .score-badge .score-num { font-size: 1.15rem; font-weight: 800; line-height: 1; }
+    .score-badge.pending { background: var(--surface2); color: var(--text-muted); border: 1px dashed var(--border); }
+    .score-badge.high    { background: #ecfdf5; color: #065f46; border: 1px solid #6ee7b7; }
+    .score-badge.mid     { background: #fffbeb; color: #92400e; border: 1px solid #fcd34d; }
+    .score-badge.low     { background: #fef2f2; color: #991b1b; border: 1px solid #fca5a5; }
+
+    /* ── Card meta ───────────────────────────────────────────────────────── */
+    .card-meta {
+      display: flex; flex-wrap: wrap; gap: 6px;
+      font-size: .78rem; color: var(--text-muted);
+    }
+    .meta-pill {
+      display: flex; align-items: center; gap: 4px;
+      padding: 2px 8px; border-radius: 20px;
+      background: var(--surface2); border: 1px solid var(--border);
+    }
+
+    .source-badge {
+      padding: 2px 8px; border-radius: 20px;
+      font-size: .7rem; font-weight: 700; text-transform: uppercase; letter-spacing: .3px;
+    }
+    .source-indeed  { background: #eff6ff; color: #1d4ed8; border: 1px solid #bfdbfe; }
+    .source-linkedin { background: #f0fdf4; color: #166534; border: 1px solid #bbf7d0; }
+
+    /* ── Verdict ─────────────────────────────────────────────────────────── */
+    .card-verdict { font-size: .8rem; color: var(--text-muted); line-height: 1.45; min-height: 1.2em; }
+
+    /* ── Dup warning ─────────────────────────────────────────────────────── */
+    .dup-badge {
+      display: inline-flex; align-items: center; gap: 5px;
+      font-size: .75rem; font-weight: 600; color: #92400e;
+      background: #fffbeb; border: 1px solid #fcd34d;
+      padding: 3px 10px; border-radius: 20px;
+      align-self: flex-start;
+    }
+
+    /* ── Card actions ────────────────────────────────────────────────────── */
+    .card-actions {
+      display: flex; gap: 8px; flex-wrap: wrap; margin-top: auto;
+    }
+    .card-actions .btn-sm { flex: 1; justify-content: center; }
+
+    /* ── State displays ──────────────────────────────────────────────────── */
+    .feed-loading, .feed-error, .feed-empty {
+      padding: 40px 24px; text-align: center;
+      color: var(--text-muted); font-size: .9rem;
+      background: var(--surface); border-radius: var(--radius);
+      box-shadow: var(--shadow);
+    }
+    .feed-error { color: #dc2626; background: #fef2f2; }
+    .li-blocked {
+      padding: 16px 20px; border-radius: var(--radius-sm);
+      background: #fffbeb; border: 1px solid #fcd34d;
+      color: #92400e; font-size: .875rem; line-height: 1.5;
+    }
+    .li-blocked a { color: var(--accent); font-weight: 600; }
+
+    /* ── Toast ───────────────────────────────────────────────────────────── */
+    .toast {
+      position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(80px);
+      background: #1a1d2e; color: #fff; font-size: .875rem; font-weight: 500;
+      padding: 10px 20px; border-radius: 8px; z-index: 999;
+      transition: transform .25s, opacity .25s; opacity: 0; pointer-events: none;
+      white-space: nowrap;
+    }
+    .toast.show { transform: translateX(-50%) translateY(0); opacity: 1; }
+    .toast.warn  { background: #b45309; }
+    .toast.error { background: #dc2626; }
+
+    /* ── Mobile ──────────────────────────────────────────────────────────── */
+    @media (max-width: 768px) {
+      body { padding: 16px 12px 40px; }
+      header { flex-direction: column; align-items: stretch; gap: 10px; }
+      header h1 { font-size: 1.3rem; }
+      .header-right { width: 100%; }
+      .header-right .btn { flex: 1; justify-content: center; }
+      .job-grid { grid-template-columns: 1fr; }
+      .btn { min-height: 44px; }
+      input { font-size: 16px !important; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>Job <span>Feed</span></h1>
+  <div class="header-right">
+    <button class="btn btn-ghost" id="autoImportBtn" onclick="runAutoImport()">
+      <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+        <polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>
+      </svg>
+      Auto Import
+    </button>
+    <a href="/job-tracker.html" class="btn btn-ghost">
+      <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg>
+      Back to Tracker
+    </a>
+  </div>
+</header>
+
+<div id="aiBanner" style="display:none" class="ai-banner"></div>
+
+<!-- ── Indeed ──────────────────────────────────────────────────────────────── -->
+<div class="section">
+  <div class="section-head">
+    <h2>Indeed Jobs</h2>
+    <span class="count" id="indeedCount"></span>
+    <button class="btn btn-ghost btn-sm" onclick="loadIndeed()">
+      <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+        <polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/>
+        <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
+      </svg>
+      Refresh
+    </button>
+  </div>
+  <p class="section-hint">Project Manager &amp; Business Operations Manager · London · last 14 days</p>
+  <div id="indeedGrid" class="job-grid">
+    <div class="feed-loading">Loading jobs from Indeed…</div>
+  </div>
+</div>
+
+<!-- ── LinkedIn ────────────────────────────────────────────────────────────── -->
+<div class="section">
+  <div class="section-head">
+    <h2>LinkedIn Jobs</h2>
+    <span class="count" id="linkedinCount"></span>
+  </div>
+  <div class="li-search">
+    <input id="linkedinUrl" type="url"
+      placeholder="Paste a LinkedIn Jobs search URL (linkedin.com/jobs/search/?keywords=…)"
+      onkeydown="if(event.key==='Enter') searchLinkedIn()" />
+    <button class="btn btn-primary" onclick="searchLinkedIn()">Search</button>
+  </div>
+  <div id="linkedinGrid" class="job-grid"></div>
+</div>
+
+<div id="toast" class="toast"></div>
+
+<script>
+'use strict';
+
+const SKIP_KEY = 'feedSkipped_v2';
+const skipped  = new Set(JSON.parse(localStorage.getItem(SKIP_KEY) || '[]'));
+
+// Job registry: id → { job, scorePromise }
+const JOBS = {};
+
+let trackerJobs = [];
+
+// ── Helpers ─────────────────────────────────────────────────────────────────
+function esc(s) {
+  return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function saveSkipped() {
+  localStorage.setItem(SKIP_KEY, JSON.stringify([...skipped]));
+}
+
+function isDup(company, role) {
+  const c = (company || '').toLowerCase().trim();
+  const r = (role    || '').toLowerCase().trim();
+  return trackerJobs.some(j =>
+    (j.company || '').toLowerCase().trim() === c &&
+    (j.role    || '').toLowerCase().trim() === r
+  );
+}
+
+function showToast(msg, type = '') {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.className = 'toast show' + (type ? ' ' + type : '');
+  clearTimeout(el._t);
+  el._t = setTimeout(() => el.classList.remove('show'), 3000);
+}
+
+function showBanner(msg, type) {
+  const el = document.getElementById('aiBanner');
+  el.textContent = msg;
+  el.className = 'ai-banner ' + type;
+  el.style.display = 'flex';
+}
+
+function hideBanner() {
+  document.getElementById('aiBanner').style.display = 'none';
+}
+
+// ── Score a single job (calls /api/match-score) ──────────────────────────────
+async function fetchScore(job) {
+  const res = await fetch('/api/match-score', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ role: job.title, company: job.company, notes: job.description || '' }),
+  });
+  if (!res.ok) throw new Error('score failed');
+  return res.json();
+}
+
+// ── Update score badge after async result ───────────────────────────────────
+function applyScore(id, score) {
+  const badge   = document.getElementById('sb-' + id);
+  const verdict = document.getElementById('vd-' + id);
+  if (!badge) return;
+
+  const cls = score.score >= 8 ? 'high' : score.score >= 6 ? 'mid' : 'low';
+  badge.className = 'score-badge ' + cls;
+  badge.innerHTML = `<span class="score-num">${score.score}</span><span>/10</span>`;
+
+  if (verdict && score.verdict) verdict.textContent = score.verdict;
+
+  if (JOBS[id]) JOBS[id]._score = score;
+}
+
+// ── Render a single job card ─────────────────────────────────────────────────
+function renderCard(job, gridId) {
+  if (skipped.has(job.id)) return;
+  const dup = isDup(job.company, job.title);
+  const grid = document.getElementById(gridId);
+  if (!grid) return;
+
+  const initial = (job.company || '?').charAt(0).toUpperCase();
+  const card = document.createElement('div');
+  card.className = 'job-card' + (dup ? ' card-dup' : '');
+  card.dataset.id = job.id;
+
+  card.innerHTML = `
+    <div class="card-top">
+      <div class="company-avatar">${esc(initial)}</div>
+      <div class="card-info">
+        <div class="card-title" title="${esc(job.title)}">${esc(job.title)}</div>
+        <div class="card-company">${esc(job.company)}</div>
+      </div>
+      <div class="score-badge pending" id="sb-${esc(job.id)}">
+        <span class="score-num">…</span>
+      </div>
+    </div>
+
+    <div class="card-meta">
+      ${job.location ? `<span class="meta-pill">📍 ${esc(job.location)}</span>` : ''}
+      ${job.salary   ? `<span class="meta-pill">💰 ${esc(job.salary)}</span>`   : ''}
+      ${job.posted   ? `<span class="meta-pill">📅 ${esc(job.posted)}</span>`   : ''}
+      <span class="source-badge source-${esc(job.source)}">${esc(job.source)}</span>
+    </div>
+
+    <div class="card-verdict" id="vd-${esc(job.id)}"></div>
+
+    ${dup ? '<span class="dup-badge">⚠ Already in tracker</span>' : ''}
+
+    <div class="card-actions">
+      <button class="btn btn-sm btn-primary" onclick="addToTracker('${esc(job.id)}')" ${dup ? 'disabled' : ''}>Add to Tracker</button>
+      <button class="btn btn-sm btn-ghost"   onclick="skipJob('${esc(job.id)}')">Skip</button>
+      ${job.url ? `<a href="${esc(job.url)}" target="_blank" rel="noopener" class="btn btn-sm btn-ghost">View ↗</a>` : ''}
+    </div>`;
+
+  grid.appendChild(card);
+}
+
+// ── Render a list of jobs and score them sequentially ───────────────────────
+async function renderJobs(jobs, gridId, countId) {
+  const grid = document.getElementById(gridId);
+  grid.innerHTML = '';
+
+  const visible = jobs.filter(j => !skipped.has(j.id));
+  const countEl = document.getElementById(countId);
+  if (countEl) countEl.textContent = visible.length ? `${visible.length} jobs` : '';
+
+  if (!visible.length) {
+    grid.innerHTML = '<div class="feed-empty">No jobs to show.</div>';
+    return;
+  }
+
+  // Register and render cards first (instant)
+  for (const job of visible) {
+    JOBS[job.id] = { ...job };
+    renderCard(job, gridId);
+  }
+
+  // Then score sequentially (one API call at a time to avoid rate limits)
+  for (const job of visible) {
+    try {
+      const score = await fetchScore(job);
+      applyScore(job.id, score);
+    } catch {
+      const badge = document.getElementById('sb-' + job.id);
+      if (badge) { badge.className = 'score-badge low'; badge.innerHTML = '<span class="score-num">–</span>'; }
+    }
+  }
+}
+
+// ── Load Indeed jobs ─────────────────────────────────────────────────────────
+async function loadIndeed() {
+  const grid = document.getElementById('indeedGrid');
+  grid.innerHTML = '<div class="feed-loading">Fetching from Indeed…</div>';
+  document.getElementById('indeedCount').textContent = '';
+
+  try {
+    const res  = await fetch('/api/search-indeed');
+    const data = await res.json();
+    if (!res.ok || data.error) {
+      grid.innerHTML = `<div class="feed-error">Could not load Indeed jobs: ${esc(data.error || res.status)}</div>`;
+      return;
+    }
+    await renderJobs(data.jobs || [], 'indeedGrid', 'indeedCount');
+  } catch (err) {
+    grid.innerHTML = `<div class="feed-error">Network error: ${esc(err.message)}</div>`;
+  }
+}
+
+// ── Search LinkedIn ──────────────────────────────────────────────────────────
+async function searchLinkedIn() {
+  const url  = document.getElementById('linkedinUrl').value.trim();
+  if (!url) return;
+
+  if (!url.includes('linkedin.com/jobs')) {
+    showToast('Paste a LinkedIn Jobs search URL (linkedin.com/jobs/search/…)', 'warn');
+    return;
+  }
+
+  const grid = document.getElementById('linkedinGrid');
+  grid.innerHTML = '<div class="feed-loading">Searching LinkedIn…</div>';
+  document.getElementById('linkedinCount').textContent = '';
+
+  try {
+    const res  = await fetch('/api/search-linkedin', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ url }),
+    });
+    const data = await res.json();
+
+    if (data.blocked) {
+      grid.innerHTML = `<div class="li-blocked">
+        <strong>LinkedIn blocked the server-side request.</strong><br>
+        Open your search directly on LinkedIn:
+        <a href="https://www.linkedin.com/jobs/search/?keywords=${encodeURIComponent(data.keywords || '')}&location=${encodeURIComponent(data.location || 'London')}" target="_blank" rel="noopener">Open on LinkedIn ↗</a>
+      </div>`;
+      return;
+    }
+
+    if (data.error && !data.jobs?.length) {
+      grid.innerHTML = `<div class="feed-error">${esc(data.error)}</div>`;
+      return;
+    }
+
+    await renderJobs(data.jobs || [], 'linkedinGrid', 'linkedinCount');
+  } catch (err) {
+    grid.innerHTML = `<div class="feed-error">Network error: ${esc(err.message)}</div>`;
+  }
+}
+
+// ── Add a job to the tracker ─────────────────────────────────────────────────
+async function addToTracker(id) {
+  const job = JOBS[id];
+  if (!job) return;
+
+  // Refresh tracker data for up-to-date dup check
+  await loadTrackerData();
+  if (isDup(job.company, job.title)) {
+    showToast('Already in your tracker', 'warn');
+    return;
+  }
+
+  const btn = document.querySelector(`[data-id="${id}"] .btn-primary`);
+  if (btn) { btn.disabled = true; btn.textContent = 'Adding…'; }
+
+  try {
+    const dataRes = await fetch('/api/data');
+    const current = await dataRes.json();
+    const existing = Array.isArray(current) ? current : [];
+
+    const newId = Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+    const score = job._score;
+    const newJob = {
+      id: newId,
+      company: job.company,
+      role: job.title,
+      status: 'Considering',
+      dateApplied: '',
+      notes: [job.url, job.description ? job.description.slice(0, 300) : ''].filter(Boolean).join('\n\n'),
+      linkedin: '',
+      referredBy: '',
+      nextAction: '',
+      nextActionDate: '',
+      matchScore:     score?.score     || null,
+      matchScoreData: score            || null,
+      addedAt: new Date().toISOString().slice(0, 10),
+    };
+
+    await fetch('/api/data', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify([...existing, newJob]),
+    });
+
+    trackerJobs = [...existing, newJob];
+
+    const card = document.querySelector(`[data-id="${id}"]`);
+    if (card) { card.classList.add('card-gone'); setTimeout(() => card.remove(), 350); }
+    showToast(`Added "${job.title}" · ${job.company}`);
+  } catch (err) {
+    showToast('Failed to add job: ' + err.message, 'error');
+    if (btn) { btn.disabled = false; btn.textContent = 'Add to Tracker'; }
+  }
+}
+
+// ── Skip a job ───────────────────────────────────────────────────────────────
+function skipJob(id) {
+  skipped.add(id);
+  saveSkipped();
+  const card = document.querySelector(`[data-id="${id}"]`);
+  if (card) { card.classList.add('card-gone'); setTimeout(() => card.remove(), 350); }
+}
+
+// ── Auto import ──────────────────────────────────────────────────────────────
+async function runAutoImport() {
+  const btn = document.getElementById('autoImportBtn');
+  btn.disabled = true;
+  btn.innerHTML = `<svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" style="animation:spin 1s linear infinite"><path d="M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0"/></svg> Importing…`;
+  showBanner('Searching Indeed and scoring jobs — this takes ~30 seconds…', 'loading');
+
+  try {
+    const res  = await fetch('/api/auto-import', { method: 'POST' });
+    const data = await res.json();
+    if (data.error) {
+      showBanner(`Auto import failed: ${data.error}`, 'error');
+    } else {
+      const noun = data.added === 1 ? 'job' : 'jobs';
+      showBanner(`Auto import complete: ${data.added} ${noun} added to tracker, ${data.skipped} skipped`, 'success');
+      if (data.added > 0) {
+        await loadTrackerData();
+        loadIndeed();
+      }
+    }
+  } catch (err) {
+    showBanner('Auto import failed: ' + err.message, 'error');
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = `<svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg> Auto Import`;
+  }
+}
+
+// ── Load tracker data for dup detection ──────────────────────────────────────
+async function loadTrackerData() {
+  try {
+    const res = await fetch('/api/data');
+    const d   = await res.json();
+    trackerJobs = Array.isArray(d) ? d : [];
+  } catch { trackerJobs = []; }
+}
+
+// ── Spinner animation ────────────────────────────────────────────────────────
+const style = document.createElement('style');
+style.textContent = '@keyframes spin { to { transform: rotate(360deg); } }';
+document.head.appendChild(style);
+
+// ── Init ─────────────────────────────────────────────────────────────────────
+async function init() {
+  await loadTrackerData();
+  loadIndeed();
+}
+
+if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js');
+init();
+</script>
+</body>
+</html>

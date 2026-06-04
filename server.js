@@ -307,6 +307,37 @@ function httpsPost(options, body) {
   });
 }
 
+function httpsGet(urlStr, extraHeaders = {}) {
+  return new Promise((resolve, reject) => {
+    try {
+      const u = new URL(urlStr);
+      const req = https.request({
+        hostname: u.hostname,
+        path: u.pathname + u.search,
+        method: 'GET',
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64; rv:109.0) Gecko/20100101 Firefox/109.0',
+          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+          'Accept-Language': 'en-GB,en;q=0.5',
+          ...extraHeaders,
+        },
+      }, res => {
+        if ([301, 302, 303, 307, 308].includes(res.statusCode) && res.headers.location) {
+          const loc = res.headers.location.startsWith('http')
+            ? res.headers.location
+            : `https://${u.hostname}${res.headers.location}`;
+          return resolve(httpsGet(loc, extraHeaders));
+        }
+        const chunks = [];
+        res.on('data', c => chunks.push(c));
+        res.on('end', () => resolve({ status: res.statusCode, body: Buffer.concat(chunks).toString('utf8') }));
+      });
+      req.on('error', reject);
+      req.end();
+    } catch (e) { reject(e); }
+  });
+}
+
 function send(res, status, obj) {
   const body = JSON.stringify(obj);
   res.writeHead(status, {
@@ -315,6 +346,150 @@ function send(res, status, obj) {
     'Access-Control-Allow-Headers': 'Content-Type',
   });
   res.end(body);
+}
+
+// ── Indeed RSS parser ──────────────────────────────────────────────────────
+function parseIndeedRSS(xml) {
+  const items = [];
+  const itemRe = /<item>([\s\S]*?)<\/item>/g;
+  let m;
+  while ((m = itemRe.exec(xml)) !== null) {
+    const block = m[1];
+    const tag = name => {
+      const r = new RegExp(`<${name}[^>]*>(?:<!\\[CDATA\\[)?([\\s\\S]*?)(?:\\]\\]>)?<\\/${name}>`, 'i');
+      return (r.exec(block)?.[1] || '').trim();
+    };
+    const decode = s => s
+      .replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>')
+      .replace(/&apos;/g, "'").replace(/&quot;/g, '"').replace(/&#(\d+);/g, (_, n) => String.fromCharCode(+n));
+    const title   = decode(tag('title'));
+    const link    = tag('link') || tag('guid');
+    const company = decode(tag('source'));
+    const pubDate = tag('pubDate');
+    const rawDesc = tag('description');
+    const clean   = decode(rawDesc.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim());
+
+    const salaryM   = clean.match(/£[\d,]+(?:\s*(?:–|-|to)\s*£[\d,]+)?(?:\s*(?:a year|per annum|\/yr|p\.a\.))?/i);
+    const locationM = clean.match(/\b((?:Greater |West |East |North |South |Central |City of )?London[^,\n]{0,25})\b/i);
+
+    if (title) {
+      items.push({
+        id: `indeed-${Buffer.from((link || title + company).slice(0, 40)).toString('base64url').slice(0, 14)}`,
+        title, company: company || 'Unknown',
+        location: (locationM?.[0] || 'London').trim(),
+        salary: salaryM?.[0] || '',
+        url: link, posted: pubDate ? new Date(pubDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : '',
+        description: clean.slice(0, 600), source: 'indeed',
+      });
+    }
+  }
+  return items;
+}
+
+// ── LinkedIn guest-API HTML parser ─────────────────────────────────────────
+function parseLinkedInJobs(html) {
+  const jobs = [];
+  const strip = s => s.replace(/<[^>]+>/g, '').trim();
+  const getAll = (re, h) => { const r = []; let m; while ((m = re.exec(h)) !== null) r.push(strip(m[1])); return r; };
+
+  const titles    = getAll(/<h3[^>]*base-search-card__title[^>]*>([\s\S]*?)<\/h3>/g, html);
+  const companies = getAll(/<h4[^>]*base-search-card__subtitle[^>]*>[\s\S]*?<a[^>]*>([\s\S]*?)<\/a>/g, html);
+  const locs      = getAll(/<span[^>]*job-search-card__location[^>]*>([\s\S]*?)<\/span>/g, html);
+  const times     = getAll(/<time[^>]*datetime="([^"]*)"[^>]*>/g, html);
+  const links     = getAll(/href="(https:\/\/www\.linkedin\.com\/jobs\/view\/[^"?]+)/g, html);
+
+  const count = Math.min(titles.length, companies.length, 25);
+  for (let i = 0; i < count; i++) {
+    if (!titles[i]) continue;
+    jobs.push({
+      id: `linkedin-${Date.now()}-${i}`,
+      title: titles[i], company: companies[i] || 'Unknown',
+      location: locs[i] || 'London', salary: '',
+      url: links[i] || '',
+      posted: times[i] ? new Date(times[i]).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : '',
+      description: '', source: 'linkedin',
+    });
+  }
+  return jobs;
+}
+
+// ── Internal job scorer (Haiku — fast & cheap for batch) ───────────────────
+async function scoreJobInternal(role, company, notes) {
+  if (!API_KEY) return null;
+  const prompt = `You are a career coach evaluating a candidate against a job listing.
+
+CANDIDATE: Efrat Gnapp, Project Manager / Business Operations Manager, London UK citizen.
+5+ years at HP Indigo: led three concurrent $40M product programs, Jira implementation for 100+ users, global demand forecasting. Skills: Agile/Lean delivery, Jira, Tableau, cross-functional coordination, budget monitoring.
+Target: PM or Business Operations Manager in London, preferably tech/startup. STRONGLY dislikes forecasting-heavy or financial-modelling roles (score 1–3). Wants hands-on delivery work.
+
+JOB: Role: ${role} | Company: ${company}
+${notes ? `Context: ${notes.slice(0, 300)}` : ''}
+
+Return ONLY valid JSON, no markdown: {"score":<1-10>,"verdict":"<one sentence>"}
+Score guide: 9-10=perfect PM/ops delivery tech role London; 7-8=strong; 5-6=partial; 3-4=weak; 1-2=poor or forecasting-heavy.`;
+
+  const reqBody = JSON.stringify({ model: 'claude-haiku-4-5-20251001', max_tokens: 128, messages: [{ role: 'user', content: prompt }] });
+  try {
+    const result = await httpsPost({
+      hostname: 'api.anthropic.com', path: '/v1/messages', method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-api-key': API_KEY, 'anthropic-version': '2023-06-01', 'Content-Length': Buffer.byteLength(reqBody) },
+    }, reqBody);
+    const data = JSON.parse(result.body);
+    if (result.status !== 200) return null;
+    const match = (data.content?.[0]?.text || '').match(/\{[\s\S]*\}/);
+    return match ? JSON.parse(match[0]) : null;
+  } catch { return null; }
+}
+
+// ── Auto-import: fetch Indeed, score, add 8+ jobs not already in tracker ───
+async function autoImport() {
+  console.log('[auto-import] starting…');
+  try {
+    const rss = await httpsGet('https://www.indeed.co.uk/rss?q=Project+Manager+OR+Business+Operations+Manager&l=London&sort=date&fromage=14');
+    if (rss.status !== 200) return { added: 0, skipped: 0, error: `Indeed RSS returned ${rss.status}` };
+
+    const jobs = parseIndeedRSS(rss.body);
+    const dataFile = path.join(__dirname, 'data.json');
+    let existing = [];
+    try { existing = JSON.parse(fs.readFileSync(dataFile, 'utf8')); } catch {}
+    if (!Array.isArray(existing)) existing = [];
+
+    let added = 0, skipped = 0;
+    const newJobs = [];
+
+    for (const job of jobs) {
+      const c = (job.company || '').toLowerCase().trim();
+      const r = (job.title  || '').toLowerCase().trim();
+      const isDup = existing.some(e => (e.company || '').toLowerCase().trim() === c && (e.role || '').toLowerCase().trim() === r);
+      if (isDup) { skipped++; continue; }
+
+      const score = await scoreJobInternal(job.title, job.company, job.description);
+      if (!score || score.score < 8) { skipped++; continue; }
+
+      const id = Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+      newJobs.push({
+        id, company: job.company, role: job.title, status: 'Considering',
+        dateApplied: '', notes: [job.url, job.description ? job.description.slice(0, 300) : ''].filter(Boolean).join('\n\n'),
+        linkedin: '', referredBy: '', nextAction: '', nextActionDate: '',
+        matchScore: score.score,
+        matchScoreData: { score: score.score, verdict: score.verdict || '', fit: '', gaps: '', position: '' },
+        addedAt: new Date().toISOString().slice(0, 10),
+      });
+      added++;
+    }
+
+    if (newJobs.length > 0) {
+      const updated = [...existing, ...newJobs];
+      const json = JSON.stringify(updated);
+      fs.writeFileSync(dataFile, json);
+      backupToGist(json);
+    }
+    console.log(`[auto-import] done — added ${added}, skipped ${skipped}`);
+    return { added, skipped };
+  } catch (err) {
+    console.error('[auto-import] error:', err.message);
+    return { added: 0, skipped: 0, error: err.message };
+  }
 }
 
 // ── server ─────────────────────────────────────────────────────────────────
@@ -546,6 +721,56 @@ const server = http.createServer(async (req, res) => {
     } catch {
       res.writeHead(404); res.end('dashboard.html not found next to server.js');
     }
+    return;
+  }
+
+  // ── GET /feed.html ───────────────────────────────────────────────────────
+  if (req.method === 'GET' && pathname === '/feed.html') {
+    try {
+      const html = fs.readFileSync(path.join(__dirname, 'feed.html'));
+      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+      res.end(html);
+    } catch { res.writeHead(404); res.end('feed.html not found'); }
+    return;
+  }
+
+  // ── GET /api/search-indeed ────────────────────────────────────────────────
+  if (req.method === 'GET' && pathname === '/api/search-indeed') {
+    try {
+      const rss = await httpsGet('https://www.indeed.co.uk/rss?q=Project+Manager+OR+Business+Operations+Manager&l=London&sort=date&fromage=14');
+      if (rss.status !== 200) { send(res, 502, { error: `Indeed returned ${rss.status}` }); return; }
+      send(res, 200, { jobs: parseIndeedRSS(rss.body) });
+    } catch (err) { send(res, 502, { error: err.message }); }
+    return;
+  }
+
+  // ── POST /api/search-linkedin ─────────────────────────────────────────────
+  if (req.method === 'POST' && pathname === '/api/search-linkedin') {
+    let raw; try { raw = await readBody(req); } catch { send(res, 400, { error: 'Bad request' }); return; }
+    let payload; try { payload = JSON.parse(raw); } catch { send(res, 400, { error: 'Invalid JSON' }); return; }
+    const { url } = payload;
+    if (!url) { send(res, 400, { error: 'url required' }); return; }
+    try {
+      const u = new URL(url);
+      const keywords = u.searchParams.get('keywords') || 'Project Manager OR Business Operations Manager';
+      const location = u.searchParams.get('location') || 'London';
+      const liUrl = `https://www.linkedin.com/jobs-guest/jobs/api/seeMoreJobPostings/search?keywords=${encodeURIComponent(keywords)}&location=${encodeURIComponent(location)}&start=0&count=25&f_TPR=r2592000`;
+      const result = await httpsGet(liUrl);
+      if ([403, 429, 999].includes(result.status)) {
+        send(res, 200, { jobs: [], blocked: true, keywords, location }); return;
+      }
+      if (result.status !== 200) {
+        send(res, 200, { jobs: [], error: `LinkedIn returned ${result.status}`, keywords, location }); return;
+      }
+      send(res, 200, { jobs: parseLinkedInJobs(result.body), keywords, location });
+    } catch (err) { send(res, 200, { jobs: [], error: err.message }); }
+    return;
+  }
+
+  // ── POST /api/auto-import ─────────────────────────────────────────────────
+  if (req.method === 'POST' && pathname === '/api/auto-import') {
+    try { send(res, 200, await autoImport()); }
+    catch (err) { send(res, 500, { error: err.message }); }
     return;
   }
 
@@ -1616,6 +1841,8 @@ async function startup() {
         console.log('  ⚠  ANTHROPIC_API_KEY is not set — screenshot extraction disabled');
       } else {
         console.log('  ✓  ANTHROPIC_API_KEY detected');
+        setInterval(autoImport, 24 * 60 * 60 * 1000);
+        console.log('  ✓  Daily auto-import scheduled (every 24 h)');
       }
       console.log('');
     });

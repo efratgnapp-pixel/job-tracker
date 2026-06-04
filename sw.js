@@ -8,6 +8,7 @@ const PRECACHE = [
   '/rejections.html',
   '/dashboard.html',
   '/archive.html',
+  '/feed.html',
   '/login.html',
   '/icon-192.png',
   '/icon-512.png',
