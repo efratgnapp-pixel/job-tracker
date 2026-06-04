@@ -430,7 +430,6 @@
       header { flex-direction: column; align-items: stretch; gap: 10px; }
       header h1 { font-size: 1.3rem; }
       .header-btns { flex-wrap: wrap; width: 100%; gap: 8px; }
-      #headerAddBtn { display: none !important; }
 
       .stats { grid-template-columns: repeat(2, 1fr); gap: 8px; }
       .stat-card { padding: 12px 14px; }
@@ -993,32 +992,6 @@
   <h1>Job Search <span>Tracker</span></h1>
   <div class="header-btns" style="display:flex;gap:10px;align-items:center;flex-shrink:0">
     <span id="syncIndicator" style="font-size:.75rem;font-weight:600;letter-spacing:.2px;white-space:nowrap;color:#6b7280">● Offline</span>
-    <div class="row-menu">
-      <button class="btn btn-ghost" onclick="toggleImportMenu(event)">
-        <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-        Import
-        <svg width="11" height="11" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24" style="margin-left:1px"><polyline points="6 9 12 15 18 9"/></svg>
-      </button>
-      <div class="row-menu-drop" id="importMenuDrop" style="left:0;right:auto">
-        <button class="row-menu-item" onclick="closeRowMenus(); openIndeedModal()">
-          <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><path d="M8 11h6M11 8v6"/></svg>
-          From Indeed
-        </button>
-        <button class="row-menu-item" onclick="closeRowMenus(); openImportModal()">
-          <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
-          From Screenshot
-        </button>
-        <button class="row-menu-item" onclick="closeRowMenus(); openLiImportModal()">
-          <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-          LinkedIn Connections
-        </button>
-        <div class="row-menu-sep"></div>
-        <button class="row-menu-item" onclick="closeRowMenus(); openJsonImportModal()">
-          <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="9" y1="13" x2="15" y2="13"/><line x1="9" y1="17" x2="15" y2="17"/></svg>
-          Import Data (JSON)
-        </button>
-      </div>
-    </div>
     <button id="scoreAllBtn" class="btn btn-ghost" onclick="scoreAll()">
       <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
       Score All
@@ -1027,13 +1000,38 @@
       <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
       Weekly Summary
     </button>
+    <a href="/feed.html" class="btn btn-ghost" style="text-decoration:none">
+      <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+      Job Feed
+    </a>
     <div class="row-menu">
       <button class="btn btn-ghost" onclick="toggleMoreMenu(event)">
         More
         <svg width="11" height="11" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24" style="margin-left:1px"><polyline points="6 9 12 15 18 9"/></svg>
       </button>
       <div class="row-menu-drop" id="moreMenuDrop" style="right:0;left:auto">
-        <a href="/feed.html" class="row-menu-item" style="text-decoration:none">🔍 Job Feed</a>
+        <button class="row-menu-item" onclick="closeRowMenus(); openModal()">
+          <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          Add Application
+        </button>
+        <div class="row-menu-sep"></div>
+        <button class="row-menu-item" onclick="closeRowMenus(); openIndeedModal()">
+          <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><path d="M8 11h6M11 8v6"/></svg>
+          Import from Indeed
+        </button>
+        <button class="row-menu-item" onclick="closeRowMenus(); openImportModal()">
+          <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+          Import from Screenshot
+        </button>
+        <button class="row-menu-item" onclick="closeRowMenus(); openLiImportModal()">
+          <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+          Import LinkedIn Connections
+        </button>
+        <button class="row-menu-item" onclick="closeRowMenus(); openJsonImportModal()">
+          <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="9" y1="13" x2="15" y2="13"/><line x1="9" y1="17" x2="15" y2="17"/></svg>
+          Import Data (JSON)
+        </button>
+        <div class="row-menu-sep"></div>
         <a href="/interviews.html" class="row-menu-item" style="text-decoration:none">🎤 Interviews</a>
         <a href="/rejections.html" class="row-menu-item" style="text-decoration:none">📊 Rejections</a>
         <a href="/dashboard.html" class="row-menu-item" style="text-decoration:none">📈 Dashboard</a>
@@ -1042,10 +1040,6 @@
         <button class="row-menu-item" onclick="closeRowMenus(); openFeedbackModal()">💬 Feedback</button>
       </div>
     </div>
-    <button id="headerAddBtn" class="btn btn-primary" onclick="openModal()">
-      <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-      Add Application
-    </button>
   </div>
 </header>
 
@@ -1967,13 +1961,7 @@
     document.querySelectorAll('.row-menu-drop.open').forEach(d => d.classList.remove('open', 'flip-up'));
   }
 
-  function toggleImportMenu(e) {
-    e.stopPropagation();
-    const drop = document.getElementById('importMenuDrop');
-    const isOpen = drop.classList.contains('open');
-    closeRowMenus();
-    if (!isOpen) drop.classList.add('open');
-  }
+
 
   function toggleMoreMenu(e) {
     e.stopPropagation();
