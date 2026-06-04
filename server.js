@@ -453,6 +453,34 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
+  // ── PWA static files (public — no auth required) ─────────────────────────
+  if (req.method === 'GET' && pathname === '/manifest.json') {
+    try {
+      const data = fs.readFileSync(path.join(__dirname, 'manifest.json'));
+      res.writeHead(200, { 'Content-Type': 'application/manifest+json', 'Cache-Control': 'public, max-age=3600' });
+      res.end(data);
+    } catch { res.writeHead(404); res.end(); }
+    return;
+  }
+
+  if (req.method === 'GET' && pathname === '/sw.js') {
+    try {
+      const data = fs.readFileSync(path.join(__dirname, 'sw.js'));
+      res.writeHead(200, { 'Content-Type': 'application/javascript', 'Cache-Control': 'no-cache' });
+      res.end(data);
+    } catch { res.writeHead(404); res.end(); }
+    return;
+  }
+
+  if (req.method === 'GET' && (pathname === '/icon-192.png' || pathname === '/icon-512.png')) {
+    try {
+      const data = fs.readFileSync(path.join(__dirname, pathname.slice(1)));
+      res.writeHead(200, { 'Content-Type': 'image/png', 'Cache-Control': 'public, max-age=86400' });
+      res.end(data);
+    } catch { res.writeHead(404); res.end(); }
+    return;
+  }
+
   // ── Auth guard — all routes below require a valid session ─────────────────
   if (!getSession(req)) {
     if (pathname.startsWith('/api/')) {
