@@ -539,10 +539,11 @@ async function addToTracker(id) {
     await fetch('/api/data', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify([...existing, newJob]),
+      body: JSON.stringify({ jobTrackerData_v1: [...existing, newJob] }),
     });
 
     trackerJobs = [...existing, newJob];
+
 
     const card = document.querySelector(`[data-id="${id}"]`);
     if (card) { card.classList.add('card-gone'); setTimeout(() => card.remove(), 350); }
@@ -594,7 +595,7 @@ async function loadTrackerData() {
   try {
     const res = await fetch('/api/data');
     const d   = await res.json();
-    trackerJobs = Array.isArray(d) ? d : [];
+    trackerJobs = Array.isArray(d) ? d : (d['jobTrackerData_v1'] || Object.values(d));
   } catch { trackerJobs = []; }
 }
 
