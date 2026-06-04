@@ -369,20 +369,30 @@ const server = http.createServer(async (req, res) => {
     const state    = url.searchParams.get('state');
     const oauthErr = url.searchParams.get('error');
 
+    console.log('[auth/callback] query params:', Object.fromEntries(url.searchParams));
+    console.log('[auth/callback] error param:', oauthErr);
+    console.log('[auth/callback] code present:', !!code, '| state present:', !!state, '| state known:', oauthStates.has(state));
+    console.log('[auth/callback] BASE_URL:', BASE_URL);
+
     if (oauthErr) {
+      console.log('[auth/callback] redirecting: cancelled');
       res.writeHead(302, { Location: '/login.html?error=cancelled' }); res.end(); return;
     }
     if (!code || !state || !oauthStates.has(state)) {
+      console.log('[auth/callback] redirecting: invalid_state');
       res.writeHead(302, { Location: '/login.html?error=invalid_state' }); res.end(); return;
     }
     oauthStates.delete(state);
 
     try {
+      const redirectUri = `${BASE_URL}/auth/google/callback`;
+      console.log('[auth/callback] token exchange redirect_uri:', redirectUri);
+
       const tokenBody = new URLSearchParams({
         code,
         client_id:     GOOGLE_CLIENT_ID,
         client_secret: GOOGLE_CLIENT_SECRET,
-        redirect_uri:  `${BASE_URL}/auth/google/callback`,
+        redirect_uri:  redirectUri,
         grant_type:    'authorization_code',
       }).toString();
 
@@ -396,9 +406,12 @@ const server = http.createServer(async (req, res) => {
         },
       }, tokenBody);
 
+      console.log('[auth/callback] token exchange status:', tokenRes.status);
+      console.log('[auth/callback] token exchange body:', tokenRes.body);
+
       const tokenData = JSON.parse(tokenRes.body);
       if (tokenRes.status !== 200 || !tokenData.id_token) {
-        console.error('[auth] token exchange failed:', tokenData);
+        console.error('[auth/callback] token exchange failed:', tokenData);
         res.writeHead(302, { Location: '/login.html?error=token' }); res.end(); return;
       }
 
