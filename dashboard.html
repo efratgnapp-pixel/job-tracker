@@ -112,7 +112,22 @@
       grid-template-columns: 1fr 1fr;
       gap: 18px;
     }
-    @media (max-width: 720px) { .charts-grid { grid-template-columns: 1fr; } }
+    @media (max-width: 768px) {
+      body { padding: 16px 12px 40px; }
+
+      header { flex-direction: column; align-items: stretch; gap: 10px; }
+      header h1 { font-size: 1.3rem; }
+      header .btn { width: 100%; justify-content: center; }
+
+      .summary-grid { grid-template-columns: repeat(2, 1fr); gap: 10px; }
+      .summary-card { padding: 14px 16px; }
+      .summary-card .sc-value { font-size: 1.6rem; }
+
+      .charts-grid { grid-template-columns: 1fr; }
+
+      .btn { min-height: 44px; }
+      input, select, textarea { font-size: 16px !important; }
+    }
 
     .chart-card {
       background: var(--surface);

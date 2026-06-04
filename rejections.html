@@ -147,7 +147,37 @@
       grid-template-columns: 1fr 1fr;
       gap: 18px;
     }
-    @media (max-width: 720px) { .charts-grid { grid-template-columns: 1fr; } }
+    @media (max-width: 768px) {
+      body { padding: 16px 12px 40px; }
+
+      header { flex-direction: column; align-items: stretch; gap: 10px; }
+      header h1 { font-size: 1.3rem; }
+      header > div { width: 100%; display: flex; gap: 8px; flex-wrap: wrap; }
+      header > div .btn { flex: 1; justify-content: center; }
+
+      .summary-grid { grid-template-columns: repeat(2, 1fr); gap: 10px; }
+      .summary-card { padding: 14px 16px; }
+      .summary-card .sc-value { font-size: 1.6rem; }
+
+      .charts-grid { grid-template-columns: 1fr; }
+
+      .table-card-header { flex-direction: column; align-items: flex-start; gap: 8px; }
+      .table-card-header input[type="search"] { width: 100% !important; }
+
+      .overlay { padding: 0; align-items: flex-end; overflow-y: hidden; }
+      .modal {
+        max-width: 100% !important;
+        width: 100%;
+        border-radius: 16px 16px 0 0;
+        max-height: 92vh;
+        overflow-y: auto;
+        padding: 24px 16px 32px;
+        margin: 0;
+      }
+
+      .btn { min-height: 44px; }
+      input, select, textarea { font-size: 16px !important; }
+    }
 
     .chart-card {
       background: var(--surface);

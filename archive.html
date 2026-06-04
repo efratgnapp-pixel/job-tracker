@@ -125,6 +125,24 @@
       color: var(--text-muted);
       background: var(--surface2);
     }
+
+    @media (max-width: 768px) {
+      body { padding: 16px 12px 40px; }
+
+      header { flex-direction: column; align-items: stretch; gap: 10px; }
+      header h1 { font-size: 1.3rem; }
+      header .btn { width: 100%; justify-content: center; }
+
+      /* Hide Date Applied(3) on mobile; keep Company, Role, Score, Notes */
+      thead th:nth-child(3),
+      tbody td:nth-child(3) { display: none; }
+
+      .td-role { max-width: 120px; }
+      .td-notes { max-width: 160px; }
+
+      .btn { min-height: 44px; }
+      input, select, textarea { font-size: 16px !important; }
+    }
   </style>
 </head>
 <body>
