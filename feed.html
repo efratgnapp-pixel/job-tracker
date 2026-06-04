@@ -516,7 +516,10 @@ async function addToTracker(id) {
   if (btn) { btn.disabled = true; btn.textContent = 'Adding…'; }
 
   try {
-    const existing = trackerJobs;
+    const dataRes = await fetch('/api/data');
+    const raw = await dataRes.json();
+    const existingArr = Array.isArray(raw) ? raw : (raw['jobTrackerData_v1'] ? raw['jobTrackerData_v1'] : Object.values(raw));
+    const existing = Object.fromEntries(existingArr.filter(j => j?.id).map(j => [j.id, j]));
 
     const newId = Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
     const score = job._score;
@@ -536,13 +539,15 @@ async function addToTracker(id) {
       addedAt: new Date().toISOString().slice(0, 10),
     };
 
+    existing[newId] = newJob;
+
     await fetch('/api/data', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ jobTrackerData_v1: [...existing, newJob] }),
+      body: JSON.stringify(existing),
     });
 
-    trackerJobs = [...existing, newJob];
+    trackerJobs = Object.values(existing);
 
 
     const card = document.querySelector(`[data-id="${id}"]`);

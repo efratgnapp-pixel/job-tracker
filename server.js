@@ -493,37 +493,36 @@ async function autoImport() {
   try {
     const jobs = await searchIndeedViaJSearch();
     const dataFile = path.join(__dirname, 'data.json');
-    let existing = [];
-    try { existing = JSON.parse(fs.readFileSync(dataFile, 'utf8')); } catch {}
-    if (!Array.isArray(existing)) existing = [];
+    let existingRaw;
+    try { existingRaw = JSON.parse(fs.readFileSync(dataFile, 'utf8')); } catch { existingRaw = {}; }
+    const existingArr = Array.isArray(existingRaw) ? existingRaw : (existingRaw['jobTrackerData_v1'] ? existingRaw['jobTrackerData_v1'] : Object.values(existingRaw));
+    const existing = Object.fromEntries(existingArr.filter(j => j?.id).map(j => [j.id, j]));
 
     let added = 0, skipped = 0;
-    const newJobs = [];
 
     for (const job of jobs) {
       const c = (job.company || '').toLowerCase().trim();
       const r = (job.title  || '').toLowerCase().trim();
-      const isDup = existing.some(e => (e.company || '').toLowerCase().trim() === c && (e.role || '').toLowerCase().trim() === r);
+      const isDup = Object.values(existing).some(e => (e.company || '').toLowerCase().trim() === c && (e.role || '').toLowerCase().trim() === r);
       if (isDup) { skipped++; continue; }
 
       const score = await scoreJobInternal(job.title, job.company, job.description);
       if (!score || score.score < 8) { skipped++; continue; }
 
       const id = Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
-      newJobs.push({
+      existing[id] = {
         id, company: job.company, role: job.title, status: 'Considering',
         dateApplied: '', notes: [job.url, job.description ? job.description.slice(0, 300) : ''].filter(Boolean).join('\n\n'),
         linkedin: '', referredBy: '', nextAction: '', nextActionDate: '',
         matchScore: score.score,
         matchScoreData: { score: score.score, verdict: score.verdict || '', fit: '', gaps: '', position: '' },
         addedAt: new Date().toISOString().slice(0, 10),
-      });
+      };
       added++;
     }
 
-    if (newJobs.length > 0) {
-      const updated = [...existing, ...newJobs];
-      const json = JSON.stringify(updated);
+    if (added > 0) {
+      const json = JSON.stringify(existing);
       fs.writeFileSync(dataFile, json);
       backupToGist(json);
     }
