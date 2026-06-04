@@ -89,6 +89,7 @@
     .stat-card.interviewing { border-color: var(--interviewing); } .stat-card.interviewing .count { color: var(--interviewing); }
     .stat-card.offer    { border-color: var(--offer);         } .stat-card.offer    .count { color: var(--offer);         }
     .stat-card.rejected { border-color: var(--rejected);      } .stat-card.rejected .count { color: var(--rejected);      }
+    .stat-card.expiring { border-color: #f59e0b; }             .stat-card.expiring .count { color: #b45309; }
 
     /* ── Toolbar ────────────────────────────────────────── */
     .toolbar {
@@ -849,6 +850,11 @@
     .followup-banner.active { background: #fef3c7; border-color: #f59e0b; }
     .badge-followup { background: #fef2f2; color: #dc2626; border: 1px solid #fecaca; margin-left: 6px; }
     .badge-followup::before { background: #dc2626; }
+    .badge-expiry { background: #fffbeb; color: #b45309; border: 1px solid #fde68a; margin-left: 6px; font-size: .7rem; }
+    .badge-expiry::before { display: none; }
+    /* ── Duplicate warning modal ───────────────────────────── */
+    #dupModal { max-width: 420px; }
+    #dupModal p { font-size: .9rem; line-height: 1.6; color: var(--text); margin-bottom: 20px; }
     .btn-followup { background: #fff7ed; color: #c2410c; border: 1.5px solid #fdba74; }
     .btn-followup:hover { background: #ffedd5; }
 
@@ -1495,6 +1501,23 @@
   </div>
 </div>
 
+<!-- ── Duplicate warning modal ─────────────────────────── -->
+<div class="overlay" id="dupOverlay">
+  <div class="modal" id="dupModal">
+    <div class="modal-header">
+      <h2>Duplicate company</h2>
+      <button class="close-btn" onclick="closeDupModal()" title="Close">
+        <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+    <p id="dupMessage"></p>
+    <div class="modal-footer">
+      <button type="button" class="btn btn-ghost" onclick="closeDupModal()">Cancel</button>
+      <button type="button" class="btn btn-primary" onclick="confirmDupSave()">Add Anyway</button>
+    </div>
+  </div>
+</div>
+
 <script>
   // ── State ───────────────────────────────────────────────
   const STORAGE_KEY = 'jobTrackerData_v1';
@@ -1594,6 +1617,13 @@
     if (!d) return '—';
     const [y, m, day] = d.split('-');
     return `${m}/${day}/${y}`;
+  }
+
+  function isExpiring(j) {
+    if (j.status !== 'Considering' && j.status !== 'Applied') return false;
+    const ref = parseDateToMs(j.dateApplied) || parseDateToMs(j.addedAt);
+    if (isNaN(ref)) return false;
+    return (Date.now() - ref) > 30 * 24 * 60 * 60 * 1000;
   }
   function gcalUrl(dateStr, title, description) {
     if (!dateStr) return null;
@@ -1731,6 +1761,7 @@
   function renderStats() {
     const counts = { total: jobs.length };
     STATUSES.forEach(s => counts[s] = jobs.filter(j => j.status === s).length);
+    const expiring = jobs.filter(isExpiring).length;
     const labels = { Applied: 'Applied', Considering: 'Considering', Interviewing: 'Interviewing', Offer: 'Offers', Rejected: 'Rejected' };
     document.getElementById('stats').innerHTML = `
       <div class="stat-card total"><div class="count">${counts.total}</div><div class="label">Total</div></div>
@@ -1739,6 +1770,7 @@
           <div class="count">${counts[s]}</div>
           <div class="label">${labels[s]}</div>
         </div>`).join('')}
+      ${expiring > 0 ? `<div class="stat-card expiring"><div class="count">${expiring}</div><div class="label">⏰ May Be Filled</div></div>` : ''}
     `;
   }
 
@@ -1783,7 +1815,7 @@
     tbody.innerHTML = list.map(j => {
       const dueClass = dueDateClass(j.nextActionDate);
       return `<tr>
-        <td class="td-company">${escHtml(j.company)}</td>
+        <td class="td-company">${escHtml(j.company)}${isExpiring(j) ? '<span class="badge badge-expiry">⏰ May be filled</span>' : ''}</td>
         <td class="td-role">${escHtml(j.role)}</td>
         <td style="white-space:nowrap">${fmtDate(j.dateApplied)}</td>
         <td id="statusCell-${j.id}"><span class="badge badge-${j.status} badge-clickable" onclick="openInlineStatus('${j.id}', event)" title="Click to change status">${j.status}</span>${j.interviews?.length ? `<span class="badge badge-round">Round ${j.interviews.length}</span>` : ''}${needsFollowUp(j) ? '<span class="badge badge-followup">Follow Up</span>' : ''}</td>
@@ -1894,7 +1926,7 @@
     const rows = list.map(j => {
       const dueClass = dueDateClass(j.nextActionDate);
       return `<tr>
-        <td class="td-company">${escHtml(j.company)}</td>
+        <td class="td-company">${escHtml(j.company)}${isExpiring(j) ? '<span class="badge badge-expiry">⏰ May be filled</span>' : ''}</td>
         <td class="td-role">${escHtml(j.role)}</td>
         <td style="white-space:nowrap">${fmtDate(j.dateApplied)}</td>
         <td id="statusCell-${j.id}"><span class="badge badge-${j.status} badge-clickable" onclick="openInlineStatus('${j.id}', event)" title="Click to change status">${j.status}</span>${j.interviews?.length ? `<span class="badge badge-round">Round ${j.interviews.length}</span>` : ''}${needsFollowUp(j) ? '<span class="badge badge-followup">Follow Up</span>' : ''}</td>
@@ -2006,7 +2038,7 @@
         </tr></thead>
         <tbody>
           ${archived.map(j => `<tr>
-            <td class="td-company">${escHtml(j.company)}</td>
+            <td class="td-company">${escHtml(j.company)}${isExpiring(j) ? '<span class="badge badge-expiry">⏰ May be filled</span>' : ''}</td>
             <td class="td-role">${escHtml(j.role)}</td>
             <td style="white-space:nowrap">${fmtDate(j.dateApplied)}</td>
             <td><span class="badge badge-Archived">Archived</span></td>
@@ -2112,7 +2144,7 @@
     if (e.target === document.getElementById('overlay')) closeModal();
   }
 
-  document.addEventListener('keydown', e => { if (e.key === 'Escape') { closeModal(); closeImportModal(); closeIndeedModal(); closeTailorModal(); closeClModal(); closeLiModal(); closeLiImportModal(); closeWsModal(); closeRejectionModal(); closeJsonImportModal(); closeFeedbackModal(); closeRowMenus(); } });
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') { closeModal(); closeDupModal(); closeImportModal(); closeIndeedModal(); closeTailorModal(); closeClModal(); closeLiModal(); closeLiImportModal(); closeWsModal(); closeRejectionModal(); closeJsonImportModal(); closeFeedbackModal(); closeRowMenus(); } });
   document.addEventListener('click', closeRowMenus);
 
   document.addEventListener('keydown', async e => {
@@ -2148,6 +2180,28 @@
   });
 
   // ── CRUD ─────────────────────────────────────────────────
+  // ── Duplicate-warning modal state ───────────────────────
+  let _pendingDupData = null;
+
+  function closeDupModal() {
+    document.getElementById('dupOverlay').classList.remove('open');
+    _pendingDupData = null;
+  }
+
+  function confirmDupSave() {
+    closeDupModal();
+    if (_pendingDupData) doSaveNew(_pendingDupData);
+  }
+
+  function doSaveNew(data) {
+    const newId = uid();
+    jobs.unshift({ id: newId, ...data, interviews: [], addedAt: today() });
+    save();
+    render();
+    closeModal();
+    fetchTableScore(newId);
+  }
+
   function submitForm(e) {
     e.preventDefault();
     const fields = ['company','role','dateApplied','status','linkedin','referredBy','nextAction','nextActionDate','notes','jobDescription'];
@@ -2174,12 +2228,16 @@
         if (saved && !saved.rejectionReason) setTimeout(() => openRejectionModal(savedId), 0);
       }
     } else {
-      const newId = uid();
-      jobs.unshift({ id: newId, ...data, interviews: [] });
-      save();
-      render();
-      closeModal();
-      fetchTableScore(newId);
+      // Duplicate detection: check for same company (case-insensitive)
+      const existing = jobs.find(j => j.company.toLowerCase() === data.company.toLowerCase());
+      if (existing) {
+        _pendingDupData = data;
+        document.getElementById('dupMessage').textContent =
+          `You already have ${existing.company} in your tracker (status: ${existing.status}). Add anyway?`;
+        document.getElementById('dupOverlay').classList.add('open');
+        return;
+      }
+      doSaveNew(data);
     }
   }
 
