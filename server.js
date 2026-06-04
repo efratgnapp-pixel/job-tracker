@@ -16,14 +16,22 @@ const HTML    = path.join(__dirname, 'job-tracker.html');
 const API_KEY = process.env.ANTHROPIC_API_KEY;
 const GIST_ID = process.env.GIST_ID;
 
-const PASSWORD = process.env.PASSWORD;
+const GOOGLE_CLIENT_ID     = process.env.GOOGLE_CLIENT_ID;
+const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET;
+const ALLOWED_EMAILS       = (process.env.ALLOWED_EMAILS || '')
+  .split(',').map(e => e.trim().toLowerCase()).filter(Boolean);
+const BASE_URL             = process.env.BASE_URL ||
+  (process.env.RENDER_EXTERNAL_URL) ||
+  `http://localhost:${PORT}`;
 
 // ── Session store ─────────────────────────────────────────────────────────────
-const sessions = new Map(); // token → expiry timestamp
+const sessions    = new Map(); // token → expiry timestamp
+const oauthStates = new Map(); // state → expiry timestamp (CSRF protection)
 
 setInterval(() => {
   const now = Date.now();
-  for (const [k, v] of sessions) if (now > v) sessions.delete(k);
+  for (const [k, v] of sessions)    if (now > v) sessions.delete(k);
+  for (const [k, v] of oauthStates) if (now > v) oauthStates.delete(k);
 }, 3_600_000);
 
 function parseCookies(header) {
@@ -46,8 +54,15 @@ function getSession(req) {
 
 // Add Secure flag when running behind HTTPS proxy (Render, etc.)
 function cookieFlags(req) {
-  const https = req.headers['x-forwarded-proto'] === 'https';
-  return `HttpOnly; SameSite=Lax; Path=/${https ? '; Secure' : ''}`;
+  const isHttps = req.headers['x-forwarded-proto'] === 'https';
+  return `HttpOnly; SameSite=Lax; Path=/${isHttps ? '; Secure' : ''}`;
+}
+
+// Decode Google ID token payload (JWT middle segment, base64url)
+function decodeJwtPayload(jwt) {
+  const part = (jwt.split('.')[1] || '').replace(/-/g, '+').replace(/_/g, '/');
+  const padded = part + '='.repeat((4 - part.length % 4) % 4);
+  return JSON.parse(Buffer.from(padded, 'base64').toString('utf8'));
 }
 
 process.on('uncaughtException', err => {
@@ -327,23 +342,89 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
-  // ── POST /auth/login ─────────────────────────────────────────────────────
-  if (req.method === 'POST' && pathname === '/auth/login') {
-    let body = '';
-    req.on('data', d => body += d);
-    req.on('end', () => {
-      const pw = new URLSearchParams(body).get('password') || '';
-      if (!PASSWORD || pw !== PASSWORD) {
-        res.writeHead(302, { Location: '/login.html?error=1' }); res.end(); return;
+  // ── GET /auth/google — redirect to Google consent screen ────────────────
+  if (req.method === 'GET' && pathname === '/auth/google') {
+    if (!GOOGLE_CLIENT_ID) {
+      res.writeHead(500); res.end('GOOGLE_CLIENT_ID is not configured'); return;
+    }
+    const state = crypto.randomBytes(16).toString('hex');
+    oauthStates.set(state, Date.now() + 10 * 60 * 1000); // 10-min TTL
+    const params = new URLSearchParams({
+      client_id:     GOOGLE_CLIENT_ID,
+      redirect_uri:  `${BASE_URL}/auth/google/callback`,
+      response_type: 'code',
+      scope:         'openid email',
+      state,
+      access_type:   'online',
+      prompt:        'select_account',
+    });
+    res.writeHead(302, { Location: `https://accounts.google.com/o/oauth2/v2/auth?${params}` });
+    res.end();
+    return;
+  }
+
+  // ── GET /auth/google/callback — exchange code, verify email, set session ─
+  if (req.method === 'GET' && pathname === '/auth/google/callback') {
+    const code     = url.searchParams.get('code');
+    const state    = url.searchParams.get('state');
+    const oauthErr = url.searchParams.get('error');
+
+    if (oauthErr) {
+      res.writeHead(302, { Location: '/login.html?error=cancelled' }); res.end(); return;
+    }
+    if (!code || !state || !oauthStates.has(state)) {
+      res.writeHead(302, { Location: '/login.html?error=invalid_state' }); res.end(); return;
+    }
+    oauthStates.delete(state);
+
+    try {
+      const tokenBody = new URLSearchParams({
+        code,
+        client_id:     GOOGLE_CLIENT_ID,
+        client_secret: GOOGLE_CLIENT_SECRET,
+        redirect_uri:  `${BASE_URL}/auth/google/callback`,
+        grant_type:    'authorization_code',
+      }).toString();
+
+      const tokenRes = await httpsPost({
+        hostname: 'oauth2.googleapis.com',
+        path:     '/token',
+        method:   'POST',
+        headers: {
+          'Content-Type':   'application/x-www-form-urlencoded',
+          'Content-Length': Buffer.byteLength(tokenBody),
+        },
+      }, tokenBody);
+
+      const tokenData = JSON.parse(tokenRes.body);
+      if (tokenRes.status !== 200 || !tokenData.id_token) {
+        console.error('[auth] token exchange failed:', tokenData);
+        res.writeHead(302, { Location: '/login.html?error=token' }); res.end(); return;
       }
+
+      const payload = decodeJwtPayload(tokenData.id_token);
+      const email   = (payload.email || '').toLowerCase();
+
+      if (!email || !payload.email_verified) {
+        res.writeHead(302, { Location: '/login.html?error=unverified' }); res.end(); return;
+      }
+      if (ALLOWED_EMAILS.length > 0 && !ALLOWED_EMAILS.includes(email)) {
+        console.warn(`[auth] blocked: ${email}`);
+        res.writeHead(302, { Location: '/login.html?error=not_allowed' }); res.end(); return;
+      }
+
       const token = crypto.randomBytes(32).toString('hex');
       sessions.set(token, Date.now() + 7 * 24 * 60 * 60 * 1000);
+      console.log(`[auth] login: ${email}`);
       res.writeHead(302, {
         'Set-Cookie': `session=${token}; Max-Age=${7 * 24 * 60 * 60}; ${cookieFlags(req)}`,
         Location: '/',
       });
       res.end();
-    });
+    } catch (err) {
+      console.error('[auth] callback error:', err);
+      res.writeHead(302, { Location: '/login.html?error=server' }); res.end();
+    }
     return;
   }
 
@@ -1485,10 +1566,10 @@ async function startup() {
       console.log('  ┌─ Job Tracker proxy server ──────────────────────┐');
       console.log(`  │  http://localhost:${PORT}/job-tracker.html         │`);
       console.log('  └─────────────────────────────────────────────────┘');
-      if (PASSWORD) {
-        console.log('  ✓  PASSWORD set — auth enabled');
+      if (GOOGLE_CLIENT_ID && GOOGLE_CLIENT_SECRET) {
+        console.log(`  ✓  Google OAuth configured (${ALLOWED_EMAILS.length ? ALLOWED_EMAILS.join(', ') : 'no email allowlist'})`);
       } else {
-        console.log('  ⚠  PASSWORD not set — all login attempts will fail');
+        console.log('  ⚠  GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET not set — auth will fail');
       }
       if (!API_KEY) {
         console.log('  ⚠  ANTHROPIC_API_KEY is not set — screenshot extraction disabled');
