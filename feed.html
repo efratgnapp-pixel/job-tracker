@@ -547,8 +547,19 @@ async function addToTracker(id) {
       body: JSON.stringify(existing),
     });
 
-    trackerJobs = Object.values(existing);
+    if (btn) btn.textContent = 'Scoring…';
 
+    try {
+      const scored = await fetchScore(job);
+      existing[newId] = { ...newJob, matchScore: scored.score ?? null, matchScoreData: scored };
+      await fetch('/api/data', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(existing),
+      });
+    } catch { /* score failed — job already saved without score */ }
+
+    trackerJobs = Object.values(existing);
 
     const card = document.querySelector(`[data-id="${id}"]`);
     if (card) { card.classList.add('card-gone'); setTimeout(() => card.remove(), 350); }
