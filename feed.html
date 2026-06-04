@@ -516,9 +516,7 @@ async function addToTracker(id) {
   if (btn) { btn.disabled = true; btn.textContent = 'Adding…'; }
 
   try {
-    const dataRes = await fetch('/api/data');
-    const current = await dataRes.json();
-    const existing = Array.isArray(current) ? current : [];
+    const existing = trackerJobs;
 
     const newId = Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
     const score = job._score;
