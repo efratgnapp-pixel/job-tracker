@@ -1860,13 +1860,18 @@ async function startup() {
   let needsRestore = false;
   try {
     const content = fs.readFileSync(dataFile, 'utf8').trim();
-    if (!content || content === '{}' || content === '[]') needsRestore = true;
+    if (!content || content === '{}' || content === '[]') {
+      needsRestore = true;
+    } else {
+      const parsed = JSON.parse(content);
+      const jobs = Array.isArray(parsed) ? parsed : (parsed['jobTrackerData_v1'] || Object.values(parsed));
+      if (jobs.length < 50) needsRestore = true;
+    }
   } catch {
-    // File doesn't exist at all
     needsRestore = true;
   }
   if (needsRestore) {
-    console.log('[startup] data.json missing or empty — attempting Gist restore…');
+    console.log('[startup] data.json missing, empty, or too few jobs — attempting Gist restore…');
     await restoreFromGist();
   }
 
