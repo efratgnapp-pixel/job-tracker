@@ -24,13 +24,29 @@ const BASE_URL             = process.env.BASE_URL ||
   (process.env.RENDER_EXTERNAL_URL) ||
   `http://localhost:${PORT}`;
 
+// ── Per-user data helpers ─────────────────────────────────────────────────────
+function emailToFilename(email) {
+  return email.toLowerCase().replace(/[@.]/g, '_');
+}
+
+const DATA_DIR = path.join(__dirname, 'data');
+fs.mkdirSync(DATA_DIR, { recursive: true });
+
+function userDataFile(email) {
+  return path.join(DATA_DIR, `${emailToFilename(email)}.json`);
+}
+
+function userCvFile(email) {
+  return path.join(DATA_DIR, `${emailToFilename(email)}-cv.txt`);
+}
+
 // ── Session store ─────────────────────────────────────────────────────────────
-const sessions    = new Map(); // token → expiry timestamp
+const sessions    = new Map(); // token → { expires, email }
 const oauthStates = new Map(); // state → expiry timestamp (CSRF protection)
 
 setInterval(() => {
   const now = Date.now();
-  for (const [k, v] of sessions)    if (now > v) sessions.delete(k);
+  for (const [k, v] of sessions)    if (now > v.expires) sessions.delete(k);
   for (const [k, v] of oauthStates) if (now > v) oauthStates.delete(k);
 }, 3_600_000);
 
@@ -45,11 +61,11 @@ function parseCookies(header) {
 }
 
 function getSession(req) {
-  const token   = parseCookies(req.headers.cookie)['session'];
-  if (!token) return false;
-  const expires = sessions.get(token);
-  if (!expires || Date.now() > expires) { sessions.delete(token); return false; }
-  return true;
+  const token = parseCookies(req.headers.cookie)['session'];
+  if (!token) return null;
+  const s = sessions.get(token);
+  if (!s || Date.now() > s.expires) { sessions.delete(token); return null; }
+  return s;
 }
 
 // Add Secure flag when running behind HTTPS proxy (Render, etc.)
@@ -492,7 +508,9 @@ async function autoImport() {
   console.log('[auto-import] starting…');
   try {
     const jobs = await searchIndeedViaJSearch();
-    const dataFile = path.join(__dirname, 'data.json');
+    const primaryEmail = ALLOWED_EMAILS[0];
+    if (!primaryEmail) { console.log('[auto-import] no primary user configured, skipping'); return { added: 0, skipped: 0 }; }
+    const dataFile = userDataFile(primaryEmail);
     let existingRaw;
     try { existingRaw = JSON.parse(fs.readFileSync(dataFile, 'utf8')); } catch { existingRaw = {}; }
     const existingArr = Array.isArray(existingRaw) ? existingRaw : (existingRaw['jobTrackerData_v1'] ? existingRaw['jobTrackerData_v1'] : Object.values(existingRaw));
@@ -524,7 +542,7 @@ async function autoImport() {
     if (added > 0) {
       const json = JSON.stringify(existing);
       fs.writeFileSync(dataFile, json);
-      backupToGist(json);
+      backupToGist(json, emailToFilename(primaryEmail));
     }
     console.log(`[auto-import] done — added ${added}, skipped ${skipped}`);
     return { added, skipped };
@@ -644,7 +662,7 @@ const server = http.createServer(async (req, res) => {
       }
 
       const token = crypto.randomBytes(32).toString('hex');
-      sessions.set(token, Date.now() + 7 * 24 * 60 * 60 * 1000);
+      sessions.set(token, { expires: Date.now() + 7 * 24 * 60 * 60 * 1000, email });
       console.log(`[auth] login: ${email}`);
       res.writeHead(302, {
         'Set-Cookie': `session=${token}; Max-Age=${7 * 24 * 60 * 60}; ${cookieFlags(req)}`,
@@ -699,7 +717,8 @@ const server = http.createServer(async (req, res) => {
   }
 
   // ── Auth guard — all routes below require a valid session ─────────────────
-  if (!getSession(req)) {
+  const session = getSession(req);
+  if (!session) {
     if (pathname.startsWith('/api/')) {
       send(res, 401, { error: 'Unauthorized' }); return;
     }
@@ -945,11 +964,10 @@ Score guide: 9–10 = near-perfect PM/ops delivery role, tech or startup context
     }
 
     let cvBase;
-    try {
-      cvBase = fs.readFileSync(path.join(__dirname, 'cv-base.txt'), 'utf8').slice(0, 8000);
-    } catch {
-      send(res, 500, { error: 'cv-base.txt not found in ~/job-tracker/' });
-      return;
+    try { cvBase = fs.readFileSync(userCvFile(session.email), 'utf8').slice(0, 8000); }
+    catch {
+      try { cvBase = fs.readFileSync(path.join(__dirname, 'cv-base.txt'), 'utf8').slice(0, 8000); }
+      catch { send(res, 500, { error: 'No CV found. Please upload your CV first.' }); return; }
     }
 
     const jobContext = jobDescription
@@ -1055,8 +1073,11 @@ STRICT FORMAT RULES — follow exactly:
     if (!role || !company) { send(res, 400, { error: 'Request must include role and company' }); return; }
 
     let cvBase;
-    try { cvBase = fs.readFileSync(path.join(__dirname, 'cv-base.txt'), 'utf8'); }
-    catch { send(res, 500, { error: 'cv-base.txt not found in ~/job-tracker/' }); return; }
+    try { cvBase = fs.readFileSync(userCvFile(session.email), 'utf8'); }
+    catch {
+      try { cvBase = fs.readFileSync(path.join(__dirname, 'cv-base.txt'), 'utf8'); }
+      catch { send(res, 500, { error: 'No CV found. Please upload your CV first.' }); return; }
+    }
 
     const todayStr = new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
 
@@ -1808,20 +1829,19 @@ Rules:
 
   // ── GET /api/data → return saved jobs ────────────────────────────────────
   if (req.method === 'GET' && pathname === '/api/data') {
-    const file = path.join(__dirname, 'data.json');
+    const file = userDataFile(session.email);
     try {
       let raw = fs.readFileSync(file, 'utf8');
       const trimmed = raw.trim();
       if (!trimmed || trimmed === '{}' || trimmed === '[]') {
-        await restoreFromGist();
+        await restoreUserFromGist(session.email);
         try { raw = fs.readFileSync(file, 'utf8'); } catch { raw = '{}'; }
       }
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(raw);
     } catch {
-      // data.json missing entirely — attempt Gist restore before giving up
       try {
-        await restoreFromGist();
+        await restoreUserFromGist(session.email);
         const restored = fs.readFileSync(file, 'utf8');
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(restored);
@@ -1840,11 +1860,27 @@ Rules:
     req.on('end', () => {
       try {
         JSON.parse(body); // validate
-        fs.writeFileSync(path.join(__dirname, 'data.json'), body);
-        backupToGist(body);
+        fs.writeFileSync(userDataFile(session.email), body);
+        backupToGist(body, emailToFilename(session.email));
         send(res, 200, { ok: true });
       } catch (err) {
         send(res, 400, { error: err.message });
+      }
+    });
+    return;
+  }
+
+  // ── POST /api/upload-cv — save user's CV text ────────────────────────────
+  if (req.method === 'POST' && pathname === '/api/upload-cv') {
+    let body = '';
+    req.on('data', d => body += d);
+    req.on('end', () => {
+      if (!body.trim()) { send(res, 400, { error: 'CV text is empty' }); return; }
+      try {
+        fs.writeFileSync(userCvFile(session.email), body);
+        send(res, 200, { ok: true });
+      } catch (err) {
+        send(res, 500, { error: err.message });
       }
     });
     return;
@@ -1854,24 +1890,42 @@ Rules:
 });
 
 async function startup() {
-  // ── Restore data from Gist if data.json is missing or empty ──────────────
-  const dataFile = path.join(__dirname, 'data.json');
-  let needsRestore = false;
-  try {
-    const content = fs.readFileSync(dataFile, 'utf8').trim();
-    if (!content || content === '{}' || content === '[]') {
-      needsRestore = true;
-    } else {
-      const parsed = JSON.parse(content);
-      const jobs = Array.isArray(parsed) ? parsed : (parsed['jobTrackerData_v1'] || Object.values(parsed));
-      if (jobs.length < 50) needsRestore = true;
+  // ── Ensure data/ directory exists ─────────────────────────────────────────
+  fs.mkdirSync(DATA_DIR, { recursive: true });
+
+  // ── Migrate legacy data.json to primary user's per-user file ──────────────
+  const legacyFile = path.join(__dirname, 'data.json');
+  const primaryEmail = ALLOWED_EMAILS[0];
+  if (primaryEmail && fs.existsSync(legacyFile)) {
+    const destFile = userDataFile(primaryEmail);
+    if (!fs.existsSync(destFile)) {
+      fs.copyFileSync(legacyFile, destFile);
+      console.log(`[startup] migrated data.json → data/${emailToFilename(primaryEmail)}.json`);
     }
-  } catch {
-    needsRestore = true;
   }
-  if (needsRestore) {
-    console.log('[startup] data.json missing, empty, or too few jobs — attempting Gist restore…');
-    await restoreFromGist();
+
+  // ── Restore from Gist if data/ is empty or primary user's file is thin ────
+  const userFiles = fs.readdirSync(DATA_DIR).filter(f => f.endsWith('.json'));
+  if (userFiles.length === 0) {
+    console.log('[startup] data/ empty — attempting Gist restore…');
+    await restoreAllFromGist();
+  } else if (primaryEmail) {
+    const pFile = userDataFile(primaryEmail);
+    let needsRestore = false;
+    try {
+      const content = fs.readFileSync(pFile, 'utf8').trim();
+      if (!content || content === '{}' || content === '[]') {
+        needsRestore = true;
+      } else {
+        const parsed = JSON.parse(content);
+        const jobs = Array.isArray(parsed) ? parsed : (parsed['jobTrackerData_v1'] || Object.values(parsed));
+        if (jobs.length < 50) needsRestore = true;
+      }
+    } catch { needsRestore = true; }
+    if (needsRestore) {
+      console.log('[startup] primary user data thin or missing — attempting Gist restore…');
+      await restoreUserFromGist(primaryEmail);
+    }
   }
 
   // ── Start listening ───────────────────────────────────────────────────────
@@ -1903,14 +1957,13 @@ async function startup() {
 
 startup();
 
-// — Gist backup helpers —
-async function backupToGist(data) {
+// ── Gist backup helpers ───────────────────────────────────────────────────────
+async function backupToGist(data, filename = 'data') {
   try {
     const token = process.env.GITHUB_TOKEN;
     const gistId = process.env.GIST_ID;
     if (!token || !gistId) return;
-    const https = require('https');
-    const payload = JSON.stringify({ files: { 'data.json': { content: data } } });
+    const payload = JSON.stringify({ files: { [`${filename}.json`]: { content: data } } });
     await new Promise((resolve, reject) => {
       const req = https.request(`https://api.github.com/gists/${gistId}`, {
         method: 'PATCH',
@@ -1920,33 +1973,49 @@ async function backupToGist(data) {
       req.write(payload);
       req.end();
     });
-    console.log('[gist] backup ok');
+    console.log(`[gist] backup ok: ${filename}.json`);
   } catch (e) { console.error('[gist] backup failed', e.message); }
 }
 
-async function restoreFromGist() {
-  try {
-    const token = process.env.GITHUB_TOKEN;
-    const gistId = process.env.GIST_ID;
-    if (!token || !gistId) return;
-    const https = require('https');
-    const data = await new Promise((resolve, reject) => {
-      const req = https.request(`https://api.github.com/gists/${gistId}`, {
-        headers: { 'Authorization': `token ${token}`, 'User-Agent': 'job-tracker' }
-      }, res => {
-        let body = '';
-        res.on('data', d => body += d);
-        res.on('end', () => {
-          try {
-            const gist = JSON.parse(body);
-            resolve(gist.files['data.json'].content);
-          } catch(e) { reject(e); }
-        });
+async function fetchGistFiles() {
+  const token = process.env.GITHUB_TOKEN;
+  const gistId = process.env.GIST_ID;
+  if (!token || !gistId) return null;
+  return new Promise((resolve, reject) => {
+    const req = https.request(`https://api.github.com/gists/${gistId}`, {
+      headers: { 'Authorization': `token ${token}`, 'User-Agent': 'job-tracker' }
+    }, res => {
+      let body = '';
+      res.on('data', d => body += d);
+      res.on('end', () => {
+        try { resolve(JSON.parse(body).files || {}); } catch(e) { reject(e); }
       });
-      req.on('error', reject);
-      req.end();
     });
-    fs.writeFileSync(path.join(__dirname, 'data.json'), data);
-    console.log('[gist] restored from backup');
+    req.on('error', reject);
+    req.end();
+  });
+}
+
+async function restoreUserFromGist(email) {
+  try {
+    const files = await fetchGistFiles();
+    if (!files) return;
+    const key = `${emailToFilename(email)}.json`;
+    const content = files[key]?.content || files['data.json']?.content;
+    if (!content) return;
+    fs.writeFileSync(userDataFile(email), content);
+    console.log(`[gist] restored ${email}`);
   } catch (e) { console.error('[gist] restore failed', e.message); }
+}
+
+async function restoreAllFromGist() {
+  try {
+    const files = await fetchGistFiles();
+    if (!files) return;
+    for (const [name, file] of Object.entries(files)) {
+      if (!name.endsWith('.json') || !file?.content) continue;
+      fs.writeFileSync(path.join(DATA_DIR, name), file.content);
+    }
+    console.log('[gist] restored all user files');
+  } catch (e) { console.error('[gist] restore all failed', e.message); }
 }
