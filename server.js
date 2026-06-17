@@ -10,6 +10,9 @@ const path  = require('path');
 
 const { Document, Packer, Paragraph, TextRun, AlignmentType, BorderStyle } = require('docx');
 const crypto = require('crypto');
+const Busboy = require('busboy');
+const pdfParse = require('pdf-parse');
+const mammoth = require('mammoth');
 
 const PORT    = process.env.PORT || 3001;
 const HTML    = path.join(__dirname, 'job-tracker.html');
@@ -664,9 +667,10 @@ const server = http.createServer(async (req, res) => {
       const token = crypto.randomBytes(32).toString('hex');
       sessions.set(token, { expires: Date.now() + 7 * 24 * 60 * 60 * 1000, email });
       console.log(`[auth] login: ${email}`);
+      const cvExists = fs.existsSync(userCvFile(email));
       res.writeHead(302, {
         'Set-Cookie': `session=${token}; Max-Age=${7 * 24 * 60 * 60}; ${cookieFlags(req)}`,
-        Location: '/',
+        Location: cvExists ? '/' : '/onboarding.html',
       });
       res.end();
     } catch (err) {
@@ -792,6 +796,85 @@ const server = http.createServer(async (req, res) => {
       res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
       res.end(html);
     } catch { res.writeHead(404); res.end('feed.html not found'); }
+    return;
+  }
+
+  // ── GET /onboarding.html ─────────────────────────────────────────────────
+  if (req.method === 'GET' && pathname === '/onboarding.html') {
+    try {
+      const html = fs.readFileSync(path.join(__dirname, 'onboarding.html'));
+      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+      res.end(html);
+    } catch {
+      res.writeHead(404); res.end('onboarding.html not found');
+    }
+    return;
+  }
+
+  // ── POST /api/upload-cv-file — multipart CV upload for new users ──────────
+  if (req.method === 'POST' && pathname === '/api/upload-cv-file') {
+    let bb;
+    try {
+      bb = Busboy({ headers: req.headers, limits: { fileSize: 10 * 1024 * 1024 } });
+    } catch {
+      res.writeHead(302, { Location: '/onboarding.html?error=bad_request' }); res.end(); return;
+    }
+
+    let fileBuffer = null;
+    let fileName = '';
+    let fileSizeLimitHit = false;
+
+    bb.on('file', (fieldname, fileStream, info) => {
+      fileName = info.filename || '';
+      const chunks = [];
+      fileStream.on('data', chunk => chunks.push(chunk));
+      fileStream.on('limit', () => { fileSizeLimitHit = true; fileStream.resume(); });
+      fileStream.on('end', () => { if (!fileSizeLimitHit) fileBuffer = Buffer.concat(chunks); });
+    });
+
+    bb.on('finish', async () => {
+      if (fileSizeLimitHit) {
+        res.writeHead(302, { Location: '/onboarding.html?error=too_large' }); res.end(); return;
+      }
+      if (!fileBuffer || !fileName) {
+        res.writeHead(302, { Location: '/onboarding.html?error=no_file' }); res.end(); return;
+      }
+
+      const ext = path.extname(fileName).toLowerCase();
+      let text = '';
+      try {
+        if (ext === '.txt') {
+          text = fileBuffer.toString('utf8');
+        } else if (ext === '.pdf') {
+          const data = await pdfParse(fileBuffer);
+          text = data.text;
+        } else if (ext === '.docx') {
+          const result = await mammoth.extractRawText({ buffer: fileBuffer });
+          text = result.value;
+        } else {
+          res.writeHead(302, { Location: '/onboarding.html?error=bad_type' }); res.end(); return;
+        }
+
+        if (!text.trim()) {
+          res.writeHead(302, { Location: '/onboarding.html?error=empty' }); res.end(); return;
+        }
+
+        fs.writeFileSync(userCvFile(session.email), text);
+        console.log(`[upload-cv-file] saved CV for ${session.email} (${ext}, ${text.length} chars)`);
+        res.writeHead(302, { Location: '/job-tracker.html' });
+        res.end();
+      } catch (err) {
+        console.error('[upload-cv-file]', err.message);
+        res.writeHead(302, { Location: '/onboarding.html?error=parse_failed' }); res.end();
+      }
+    });
+
+    bb.on('error', err => {
+      console.error('[upload-cv-file busboy]', err.message);
+      res.writeHead(302, { Location: '/onboarding.html?error=upload_failed' }); res.end();
+    });
+
+    req.pipe(bb);
     return;
   }
 
@@ -1824,6 +1907,12 @@ Rules:
     } catch (err) {
       send(res, 502, { error: 'Could not reach Anthropic: ' + (err.message || err) });
     }
+    return;
+  }
+
+  // ── GET /api/me → current user info ─────────────────────────────────────
+  if (req.method === 'GET' && pathname === '/api/me') {
+    send(res, 200, { email: session.email });
     return;
   }
 

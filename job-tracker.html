@@ -989,7 +989,10 @@
 
 <!-- ── Header ─────────────────────────────────────────────── -->
 <header>
-  <h1>Job Search <span>Tracker</span></h1>
+  <div>
+    <div id="user-greeting" style="font-size:.72rem;font-weight:500;color:var(--text-muted);letter-spacing:.2px;margin-bottom:2px"></div>
+    <h1>Job Search <span>Tracker</span></h1>
+  </div>
   <div class="header-btns" style="display:flex;gap:10px;align-items:center;flex-shrink:0">
     <span id="syncIndicator" style="font-size:.75rem;font-weight:600;letter-spacing:.2px;white-space:nowrap;color:#6b7280">● Offline</span>
     <button id="scoreAllBtn" class="btn btn-ghost" onclick="scoreAll()">
@@ -4392,6 +4395,20 @@
   }
 
   // ── Boot ─────────────────────────────────────────────────
+  (async () => {
+    try {
+      const r = await fetch('/api/me');
+      if (r.ok) {
+        const { email } = await r.json();
+        const local = (email || '').split('@')[0];
+        const first = local.replace(/[.\-_\d].*$/, '');
+        if (first) {
+          const name = first.charAt(0).toUpperCase() + first.slice(1).toLowerCase();
+          document.getElementById('user-greeting').textContent = `Hello, ${name}`;
+        }
+      }
+    } catch {}
+  })();
   loadLiConnections();
   load().then(() => render());
 </script>
