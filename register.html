@@ -1,0 +1,542 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Job Tracker — Register</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #f4f3ff;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+    }
+
+    .card {
+      background: #fff;
+      border-radius: 16px;
+      box-shadow: 0 4px 24px rgba(109, 40, 217, 0.1);
+      width: 100%;
+      max-width: 520px;
+      padding: 40px 36px;
+    }
+
+    .logo {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 28px;
+    }
+
+    .logo-icon {
+      width: 40px;
+      height: 40px;
+      background: linear-gradient(135deg, #7c3aed, #6d28d9);
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #fff;
+      font-weight: 800;
+      font-size: 16px;
+      letter-spacing: -1px;
+    }
+
+    .logo-text {
+      font-size: 18px;
+      font-weight: 700;
+      color: #1e1b4b;
+    }
+
+    h1 {
+      font-size: 22px;
+      font-weight: 700;
+      color: #1e1b4b;
+      margin-bottom: 4px;
+    }
+
+    .subtitle {
+      font-size: 14px;
+      color: #6b7280;
+      margin-bottom: 28px;
+    }
+
+    .form-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px;
+    }
+
+    .form-group {
+      margin-bottom: 16px;
+    }
+
+    .form-group.full { grid-column: 1 / -1; }
+
+    label {
+      display: block;
+      font-size: 13px;
+      font-weight: 600;
+      color: #374151;
+      margin-bottom: 6px;
+    }
+
+    label span.req { color: #7c3aed; margin-left: 2px; }
+
+    input[type="text"],
+    input[type="email"],
+    input[type="password"],
+    input[type="url"] {
+      width: 100%;
+      padding: 10px 12px;
+      border: 1.5px solid #e5e7eb;
+      border-radius: 8px;
+      font-size: 14px;
+      color: #111827;
+      transition: border-color 0.15s, box-shadow 0.15s;
+      outline: none;
+    }
+
+    input:focus {
+      border-color: #7c3aed;
+      box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.12);
+    }
+
+    input.error {
+      border-color: #ef4444;
+    }
+
+    .field-error {
+      font-size: 12px;
+      color: #ef4444;
+      margin-top: 4px;
+      display: none;
+    }
+
+    .field-error.visible { display: block; }
+
+    /* CV upload */
+    .cv-upload {
+      border: 2px dashed #d1d5db;
+      border-radius: 10px;
+      padding: 20px;
+      text-align: center;
+      cursor: pointer;
+      transition: border-color 0.15s, background 0.15s;
+      position: relative;
+    }
+
+    .cv-upload:hover, .cv-upload.dragover {
+      border-color: #7c3aed;
+      background: #f5f3ff;
+    }
+
+    .cv-upload input[type="file"] {
+      position: absolute;
+      inset: 0;
+      opacity: 0;
+      cursor: pointer;
+      width: 100%;
+      height: 100%;
+    }
+
+    .cv-upload-icon {
+      font-size: 28px;
+      margin-bottom: 6px;
+    }
+
+    .cv-upload-label {
+      font-size: 13px;
+      color: #6b7280;
+    }
+
+    .cv-upload-label strong {
+      color: #7c3aed;
+    }
+
+    .cv-filename {
+      font-size: 13px;
+      color: #7c3aed;
+      font-weight: 600;
+      margin-top: 6px;
+      display: none;
+    }
+
+    /* Password strength */
+    .password-strength {
+      margin-top: 6px;
+      height: 4px;
+      border-radius: 2px;
+      background: #e5e7eb;
+      overflow: hidden;
+    }
+
+    .password-strength-bar {
+      height: 100%;
+      border-radius: 2px;
+      width: 0;
+      transition: width 0.3s, background 0.3s;
+    }
+
+    .strength-label {
+      font-size: 11px;
+      color: #9ca3af;
+      margin-top: 3px;
+    }
+
+    /* Divider */
+    .divider {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin: 20px 0;
+      color: #9ca3af;
+      font-size: 12px;
+    }
+
+    .divider::before, .divider::after {
+      content: '';
+      flex: 1;
+      border-top: 1px solid #e5e7eb;
+    }
+
+    /* Google button */
+    .btn-google {
+      width: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      padding: 10px;
+      border: 1.5px solid #e5e7eb;
+      border-radius: 8px;
+      background: #fff;
+      font-size: 14px;
+      font-weight: 500;
+      color: #374151;
+      cursor: pointer;
+      transition: background 0.15s, border-color 0.15s;
+      text-decoration: none;
+    }
+
+    .btn-google:hover {
+      background: #f9fafb;
+      border-color: #d1d5db;
+    }
+
+    .btn-google svg { flex-shrink: 0; }
+
+    /* Submit button */
+    .btn-submit {
+      width: 100%;
+      padding: 12px;
+      background: linear-gradient(135deg, #7c3aed, #6d28d9);
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      font-size: 15px;
+      font-weight: 600;
+      cursor: pointer;
+      margin-top: 6px;
+      transition: opacity 0.15s, transform 0.1s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+    }
+
+    .btn-submit:hover { opacity: 0.92; }
+    .btn-submit:active { transform: scale(0.99); }
+    .btn-submit:disabled { opacity: 0.6; cursor: not-allowed; }
+
+    .spinner {
+      width: 16px;
+      height: 16px;
+      border: 2px solid rgba(255,255,255,0.4);
+      border-top-color: #fff;
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+      display: none;
+    }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .signin-link {
+      text-align: center;
+      font-size: 13px;
+      color: #6b7280;
+      margin-top: 20px;
+    }
+
+    .signin-link a {
+      color: #7c3aed;
+      font-weight: 600;
+      text-decoration: none;
+    }
+
+    .signin-link a:hover { text-decoration: underline; }
+
+    /* Alert */
+    .alert {
+      padding: 10px 14px;
+      border-radius: 8px;
+      font-size: 13px;
+      margin-bottom: 16px;
+      display: none;
+    }
+
+    .alert.error { background: #fef2f2; color: #b91c1c; border: 1px solid #fecaca; display: block; }
+    .alert.success { background: #f0fdf4; color: #15803d; border: 1px solid #bbf7d0; display: block; }
+
+    @media (max-width: 480px) {
+      .card { padding: 28px 20px; }
+      .form-row { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+<div class="card">
+  <div class="logo">
+    <div class="logo-icon">JT</div>
+    <span class="logo-text">Job Tracker</span>
+  </div>
+
+  <h1>Create your account</h1>
+  <p class="subtitle">Start tracking your job search in minutes.</p>
+
+  <div id="alert" class="alert"></div>
+
+  <!-- Google OAuth -->
+  <a href="/auth/google" class="btn-google">
+    <svg width="18" height="18" viewBox="0 0 48 48">
+      <path fill="#4285F4" d="M44.5 20H24v8.5h11.8C34.6 33.1 30 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.9 1.1 8.1 3l6-6C34.5 6.5 29.5 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20c11 0 19.7-8 19.7-20 0-1.3-.1-2.7-.2-4z"/>
+      <path fill="#34A853" d="M6.3 14.7l7 5.1C15 16.1 19.1 13 24 13c3.1 0 5.9 1.1 8.1 3l6-6C34.5 6.5 29.5 4 24 4 16.3 4 9.6 8.3 6.3 14.7z"/>
+      <path fill="#FBBC05" d="M24 44c5.9 0 10.9-2 14.5-5.4l-6.7-5.5C29.9 35 27.1 36 24 36c-5.9 0-10.9-3.8-12.7-9.1l-7 5.4C7.8 39.5 15.3 44 24 44z"/>
+      <path fill="#EA4335" d="M44.5 20H24v8.5h11.8c-.8 2.3-2.3 4.3-4.3 5.6l6.7 5.5C41.8 36.2 44.5 30.6 44.5 24c0-1.3-.1-2.7-.2-4z"/>
+    </svg>
+    Continue with Google
+  </a>
+
+  <div class="divider">or register with email</div>
+
+  <form id="registerForm" novalidate>
+    <div class="form-row">
+      <div class="form-group">
+        <label for="fullName">Full name <span class="req">*</span></label>
+        <input type="text" id="fullName" name="fullName" placeholder="Jane Smith" autocomplete="name" />
+        <div class="field-error" id="err-fullName">Please enter your full name.</div>
+      </div>
+
+      <div class="form-group">
+        <label for="email">Email <span class="req">*</span></label>
+        <input type="email" id="email" name="email" placeholder="jane@example.com" autocomplete="email" />
+        <div class="field-error" id="err-email">Please enter a valid email.</div>
+      </div>
+
+      <div class="form-group">
+        <label for="password">Password <span class="req">*</span></label>
+        <input type="password" id="password" name="password" placeholder="Min. 8 characters" autocomplete="new-password" />
+        <div class="password-strength"><div class="password-strength-bar" id="strengthBar"></div></div>
+        <div class="strength-label" id="strengthLabel"></div>
+        <div class="field-error" id="err-password">Password must be at least 8 characters.</div>
+      </div>
+
+      <div class="form-group">
+        <label for="targetRole">Target job title <span class="req">*</span></label>
+        <input type="text" id="targetRole" name="targetRole" placeholder="e.g. Product Manager" />
+        <div class="field-error" id="err-targetRole">Please enter your target role.</div>
+      </div>
+
+      <div class="form-group full">
+        <label for="location">Preferred location</label>
+        <input type="text" id="location" name="location" placeholder="e.g. London, UK" />
+      </div>
+
+      <div class="form-group full">
+        <label for="linkedin">LinkedIn profile URL</label>
+        <input type="url" id="linkedin" name="linkedin" placeholder="https://linkedin.com/in/your-name" />
+        <div class="field-error" id="err-linkedin">Please enter a valid LinkedIn URL.</div>
+      </div>
+    </div>
+
+    <!-- CV Upload -->
+    <div class="form-group">
+      <label>CV / Resume</label>
+      <div class="cv-upload" id="cvDrop">
+        <input type="file" id="cvFile" name="cv" accept=".pdf,.doc,.docx" />
+        <div class="cv-upload-icon">📄</div>
+        <div class="cv-upload-label"><strong>Click to upload</strong> or drag & drop</div>
+        <div class="cv-upload-label" style="margin-top:2px;font-size:12px;">PDF, DOC, DOCX · max 5 MB</div>
+        <div class="cv-filename" id="cvFilename"></div>
+      </div>
+      <div class="field-error" id="err-cv">File too large. Max 5 MB.</div>
+    </div>
+
+    <button type="submit" class="btn-submit" id="submitBtn">
+      <div class="spinner" id="spinner"></div>
+      <span id="submitLabel">Create account</span>
+    </button>
+  </form>
+
+  <p class="signin-link">Already have an account? <a href="/login.html">Sign in</a></p>
+</div>
+
+<script>
+  // --- Password strength ---
+  const passwordInput = document.getElementById('password');
+  const strengthBar = document.getElementById('strengthBar');
+  const strengthLabel = document.getElementById('strengthLabel');
+
+  passwordInput.addEventListener('input', () => {
+    const val = passwordInput.value;
+    let score = 0;
+    if (val.length >= 8) score++;
+    if (val.length >= 12) score++;
+    if (/[A-Z]/.test(val)) score++;
+    if (/[0-9]/.test(val)) score++;
+    if (/[^A-Za-z0-9]/.test(val)) score++;
+
+    const levels = [
+      { w: '0%', bg: '#e5e7eb', label: '' },
+      { w: '25%', bg: '#ef4444', label: 'Weak' },
+      { w: '50%', bg: '#f97316', label: 'Fair' },
+      { w: '75%', bg: '#eab308', label: 'Good' },
+      { w: '100%', bg: '#22c55e', label: 'Strong' },
+    ];
+
+    const lvl = val.length === 0 ? 0 : Math.min(score, 4);
+    strengthBar.style.width = levels[lvl].w;
+    strengthBar.style.background = levels[lvl].bg;
+    strengthLabel.textContent = levels[lvl].label;
+    strengthLabel.style.color = levels[lvl].bg;
+  });
+
+  // --- CV upload ---
+  const cvFile = document.getElementById('cvFile');
+  const cvDrop = document.getElementById('cvDrop');
+  const cvFilename = document.getElementById('cvFilename');
+
+  cvFile.addEventListener('change', () => {
+    const f = cvFile.files[0];
+    if (f) {
+      cvFilename.style.display = 'block';
+      cvFilename.textContent = '✓ ' + f.name;
+    }
+  });
+
+  cvDrop.addEventListener('dragover', e => { e.preventDefault(); cvDrop.classList.add('dragover'); });
+  cvDrop.addEventListener('dragleave', () => cvDrop.classList.remove('dragover'));
+  cvDrop.addEventListener('drop', e => {
+    e.preventDefault();
+    cvDrop.classList.remove('dragover');
+    if (e.dataTransfer.files[0]) {
+      cvFile.files = e.dataTransfer.files;
+      cvFilename.style.display = 'block';
+      cvFilename.textContent = '✓ ' + e.dataTransfer.files[0].name;
+    }
+  });
+
+  // --- Validation helpers ---
+  function showError(fieldId, msg) {
+    const input = document.getElementById(fieldId);
+    const err = document.getElementById('err-' + fieldId);
+    if (input) input.classList.add('error');
+    if (err) { err.textContent = msg || err.textContent; err.classList.add('visible'); }
+  }
+
+  function clearError(fieldId) {
+    const input = document.getElementById(fieldId);
+    const err = document.getElementById('err-' + fieldId);
+    if (input) input.classList.remove('error');
+    if (err) err.classList.remove('visible');
+  }
+
+  // Clear error on input
+  ['fullName','email','password','targetRole','linkedin'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.addEventListener('input', () => clearError(id));
+  });
+
+  // --- Form submit ---
+  document.getElementById('registerForm').addEventListener('submit', async e => {
+    e.preventDefault();
+
+    const fullName  = document.getElementById('fullName').value.trim();
+    const email     = document.getElementById('email').value.trim();
+    const password  = document.getElementById('password').value;
+    const targetRole = document.getElementById('targetRole').value.trim();
+    const location  = document.getElementById('location').value.trim();
+    const linkedin  = document.getElementById('linkedin').value.trim();
+    const cv        = cvFile.files[0];
+    const alert     = document.getElementById('alert');
+
+    alert.className = 'alert';
+    alert.textContent = '';
+
+    let valid = true;
+
+    if (!fullName) { showError('fullName'); valid = false; }
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { showError('email'); valid = false; }
+    if (password.length < 8) { showError('password'); valid = false; }
+    if (!targetRole) { showError('targetRole'); valid = false; }
+    if (linkedin && !/^https?:\/\/(www\.)?linkedin\.com\/in\/.+/.test(linkedin)) {
+      showError('linkedin', 'Enter a valid LinkedIn URL (linkedin.com/in/...)');
+      valid = false;
+    }
+    if (cv && cv.size > 5 * 1024 * 1024) {
+      document.getElementById('err-cv').classList.add('visible');
+      valid = false;
+    }
+
+    if (!valid) return;
+
+    // Show loading state
+    const btn = document.getElementById('submitBtn');
+    const spinner = document.getElementById('spinner');
+    const label = document.getElementById('submitLabel');
+    btn.disabled = true;
+    spinner.style.display = 'block';
+    label.textContent = 'Creating account…';
+
+    try {
+      const formData = new FormData();
+      formData.append('fullName', fullName);
+      formData.append('email', email);
+      formData.append('password', password);
+      formData.append('targetRole', targetRole);
+      formData.append('location', location);
+      formData.append('linkedin', linkedin);
+      if (cv) formData.append('cv', cv);
+
+      const res = await fetch('/api/register', {
+        method: 'POST',
+        body: formData,
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.error || 'Registration failed. Please try again.');
+      }
+
+      alert.className = 'alert success';
+      alert.textContent = '✓ Account created! Redirecting…';
+      setTimeout(() => window.location.href = '/job-tracker.html', 1200);
+
+    } catch (err) {
+      alert.className = 'alert error';
+      alert.textContent = err.message;
+      btn.disabled = false;
+      spinner.style.display = 'none';
+      label.textContent = 'Create account';
+    }
+  });
+</script>
+</body>
+</html>

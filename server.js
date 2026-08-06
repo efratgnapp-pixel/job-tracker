@@ -13,6 +13,7 @@ const crypto = require('crypto');
 const Busboy = require('busboy');
 const pdfParse = require('pdf-parse');
 const mammoth = require('mammoth');
+const bcrypt = require('bcrypt');
 
 const PORT    = process.env.PORT || 3001;
 const HTML    = path.join(__dirname, 'job-tracker.html');
@@ -41,6 +42,21 @@ function userDataFile(email) {
 
 function userCvFile(email) {
   return path.join(DATA_DIR, `${emailToFilename(email)}-cv.txt`);
+}
+
+// ── Users store (email+password accounts) ────────────────────────────────────
+const USERS_FILE = path.join(__dirname, 'users.json');
+const CV_UPLOAD_DIR = path.join(__dirname, 'cvs');
+fs.mkdirSync(CV_UPLOAD_DIR, { recursive: true });
+
+function loadUsers() {
+  if (!fs.existsSync(USERS_FILE)) return {};
+  try { return JSON.parse(fs.readFileSync(USERS_FILE, 'utf8')); }
+  catch { return {}; }
+}
+
+function saveUsers(users) {
+  fs.writeFileSync(USERS_FILE, JSON.stringify(users, null, 2));
 }
 
 // ── Session store ─────────────────────────────────────────────────────────────
@@ -691,6 +707,130 @@ const server = http.createServer(async (req, res) => {
     res.end();
     return;
   }
+
+  // ── Serve register.html (public) ─────────────────────────────────────────
+  if (req.method === 'GET' && pathname === '/register.html') {
+    try {
+      const html = fs.readFileSync(path.join(__dirname, 'register.html'));
+      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+      res.end(html);
+    } catch { res.writeHead(404); res.end('register.html not found'); }
+    return;
+  }
+
+  // ── POST /api/register — email+password registration ─────────────────────
+  if (req.method === 'POST' && pathname === '/api/register') {
+    let bb;
+    try { bb = Busboy({ headers: req.headers, limits: { fileSize: 5 * 1024 * 1024 } }); }
+    catch { send(res, 400, { error: 'Invalid request.' }); return; }
+
+    const fields = {};
+    let cvBuffer = null, cvFilename = '', cvSizeLimitHit = false;
+
+    bb.on('field', (name, val) => { fields[name] = val; });
+    bb.on('file', (fieldname, fileStream, info) => {
+      cvFilename = info.filename || '';
+      const chunks = [];
+      fileStream.on('data', c => chunks.push(c));
+      fileStream.on('limit', () => { cvSizeLimitHit = true; fileStream.resume(); });
+      fileStream.on('end', () => { if (!cvSizeLimitHit) cvBuffer = Buffer.concat(chunks); });
+    });
+    bb.on('finish', async () => {
+      if (cvSizeLimitHit) { send(res, 400, { error: 'CV file too large (max 5 MB).' }); return; }
+
+      const { fullName = '', email = '', password = '', targetRole = '', location = '', linkedin = '' } = fields;
+      const emailNorm = email.trim().toLowerCase();
+
+      if (!fullName.trim() || !emailNorm || !password || !targetRole.trim()) {
+        send(res, 400, { error: 'Full name, email, password and target role are required.' }); return;
+      }
+      if (password.length < 8) { send(res, 400, { error: 'Password must be at least 8 characters.' }); return; }
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailNorm)) { send(res, 400, { error: 'Invalid email address.' }); return; }
+
+      const users = loadUsers();
+      if (users[emailNorm]) { send(res, 409, { error: 'An account with this email already exists.' }); return; }
+
+      // Save CV file (binary) — only at registration
+      let cvPath = null;
+      if (cvBuffer && cvBuffer.length > 0 && cvFilename) {
+        const ext = path.extname(cvFilename).toLowerCase() || '.pdf';
+        const allowed = ['.pdf', '.doc', '.docx'];
+        if (allowed.includes(ext)) {
+          const safeEmail = emailNorm.replace(/[^a-z0-9]/g, '-');
+          const dest = path.join(CV_UPLOAD_DIR, `cv-${safeEmail}${ext}`);
+          fs.writeFileSync(dest, cvBuffer);
+          cvPath = `cvs/cv-${safeEmail}${ext}`;
+
+          // Also parse CV text for the AI features (reuse existing helpers)
+          try {
+            let text = '';
+            if (ext === '.pdf') { const d = await pdfParse(cvBuffer); text = d.text; }
+            else if (ext === '.docx') { const r = await mammoth.extractRawText({ buffer: cvBuffer }); text = r.value; }
+            if (text.trim()) fs.writeFileSync(userCvFile(emailNorm), text);
+          } catch (e) { console.warn('[register] CV parse warning:', e.message); }
+        }
+      }
+
+      const passwordHash = await bcrypt.hash(password, 12);
+      users[emailNorm] = {
+        id: `user-${Date.now()}`,
+        fullName: fullName.trim(),
+        email: emailNorm,
+        passwordHash,
+        targetRole: targetRole.trim(),
+        location: location.trim(),
+        linkedin: linkedin.trim(),
+        cvPath,
+        createdAt: new Date().toISOString(),
+        authProvider: 'email',
+      };
+      saveUsers(users);
+      console.log(`[register] new user: ${emailNorm}`);
+
+      // Create session
+      const token = crypto.randomBytes(32).toString('hex');
+      sessions.set(token, { expires: Date.now() + 7 * 24 * 60 * 60 * 1000, email: emailNorm });
+      res.writeHead(200, {
+        'Set-Cookie': `session=${token}; Max-Age=${7 * 24 * 60 * 60}; ${cookieFlags(req)}`,
+        'Content-Type': 'application/json',
+      });
+      res.end(JSON.stringify({ ok: true, redirect: '/job-tracker.html' }));
+    });
+    req.pipe(bb);
+    return;
+  }
+
+  // ── POST /api/login-email — email+password login ──────────────────────────
+  if (req.method === 'POST' && pathname === '/api/login-email') {
+    let body = '';
+    req.on('data', c => body += c);
+    req.on('end', async () => {
+      let email = '', password = '';
+      try { ({ email = '', password = '' } = JSON.parse(body)); }
+      catch { send(res, 400, { error: 'Invalid JSON.' }); return; }
+
+      const emailNorm = email.trim().toLowerCase();
+      const users = loadUsers();
+      const user = users[emailNorm];
+
+      if (!user || !user.passwordHash) { send(res, 401, { error: 'Invalid email or password.' }); return; }
+      const match = await bcrypt.compare(password, user.passwordHash);
+      if (!match) { send(res, 401, { error: 'Invalid email or password.' }); return; }
+
+      const token = crypto.randomBytes(32).toString('hex');
+      sessions.set(token, { expires: Date.now() + 7 * 24 * 60 * 60 * 1000, email: emailNorm });
+      console.log(`[login-email] ${emailNorm}`);
+      res.writeHead(200, {
+        'Set-Cookie': `session=${token}; Max-Age=${7 * 24 * 60 * 60}; ${cookieFlags(req)}`,
+        'Content-Type': 'application/json',
+      });
+      res.end(JSON.stringify({ ok: true, redirect: '/job-tracker.html' }));
+    });
+    return;
+  }
+
+  // ── Serve uploaded CVs (auth required — enforced below) ───────────────────
+  // (CVs are served after the auth guard further down)
 
   // ── PWA static files (public — no auth required) ─────────────────────────
   if (req.method === 'GET' && pathname === '/manifest.json') {
