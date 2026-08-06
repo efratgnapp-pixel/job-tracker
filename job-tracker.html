@@ -1633,7 +1633,7 @@
         setSyncStatus('synced');
         return;
       }
-    } catch {}
+    } catch (e) { console.error('[load] fetch/parse error:', e); }
     // Fallback to localStorage
     try { jobs = JSON.parse(localStorage.getItem(STORAGE_KEY)) || []; }
     catch { jobs = []; }
