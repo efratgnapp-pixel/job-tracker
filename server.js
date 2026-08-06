@@ -470,27 +470,59 @@ function parseIndeedRSS(xml) {
 // ── LinkedIn guest-API HTML parser ─────────────────────────────────────────
 function parseLinkedInJobs(html) {
   const jobs = [];
-  const strip = s => s.replace(/<[^>]+>/g, '').trim();
-  const getAll = (re, h) => { const r = []; let m; while ((m = re.exec(h)) !== null) r.push(strip(m[1])); return r; };
+  const strip = s => s.replace(/<[^>]+>/g, '').replace(/&amp;/g, '&').replace(/&#39;/g, "'").replace(/&quot;/g, '"').trim();
 
-  const titles    = getAll(/<h3[^>]*base-search-card__title[^>]*>([\s\S]*?)<\/h3>/g, html);
-  const companies = getAll(/<h4[^>]*base-search-card__subtitle[^>]*>[\s\S]*?<a[^>]*>([\s\S]*?)<\/a>/g, html);
-  const locs      = getAll(/<span[^>]*job-search-card__location[^>]*>([\s\S]*?)<\/span>/g, html);
-  const times     = getAll(/<time[^>]*datetime="([^"]*)"[^>]*>/g, html);
-  const links     = getAll(/href="(https:\/\/www\.linkedin\.com\/jobs\/view\/[^"?]+)/g, html);
+  // Split into individual job cards so each field is read per-card
+  const cardRe = /<(?:div|li)[^>]*base-search-card[^>]*>([\s\S]*?)<\/(?:div|li)>/g;
+  let cardMatch;
+  let cardIndex = 0;
+  while ((cardMatch = cardRe.exec(html)) !== null && cardIndex < 25) {
+    const card = cardMatch[1];
 
-  const count = Math.min(titles.length, companies.length, 25);
-  for (let i = 0; i < count; i++) {
-    if (!titles[i]) continue;
+    const titleM   = /<h3[^>]*>([\s\S]*?)<\/h3>/i.exec(card);
+    // Company: may be wrapped in <a> or just plain text inside <h4>
+    const compM    = /<h4[^>]*>([\s\S]*?)<\/h4>/i.exec(card);
+    const locM     = /<span[^>]*location[^>]*>([\s\S]*?)<\/span>/i.exec(card);
+    const timeM    = /<time[^>]*datetime="([^"]+)"/i.exec(card);
+    const linkM    = /href="(https:\/\/www\.linkedin\.com\/jobs\/view\/[^"?]+)/i.exec(card);
+
+    const title   = titleM  ? strip(titleM[1])  : '';
+    const company = compM   ? strip(compM[1])   : 'Unknown';
+    const loc     = locM    ? strip(locM[1])    : 'London';
+    const time    = timeM   ? timeM[1]          : '';
+    const url     = linkM   ? linkM[1]          : '';
+
+    if (!title || !url) { cardIndex++; continue; }
+
     jobs.push({
-      id: `linkedin-${Date.now()}-${i}`,
-      title: titles[i], company: companies[i] || 'Unknown',
-      location: locs[i] || 'London', salary: '',
-      url: links[i] || '',
-      posted: times[i] ? new Date(times[i]).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : '',
+      id: `linkedin-${Date.now()}-${cardIndex}`,
+      title, company, location: loc, salary: '',
+      url,
+      posted: time ? new Date(time).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : '',
       description: '', source: 'linkedin',
     });
+    cardIndex++;
   }
+
+  // Fallback: if card-splitting found nothing, use old parallel-array approach
+  if (jobs.length === 0) {
+    const getAll = (re, h) => { const r = []; let m; while ((m = re.exec(h)) !== null) r.push(strip(m[1])); return r; };
+    const titles  = getAll(/<h3[^>]*>([\s\S]*?)<\/h3>/g, html);
+    const links   = getAll(/href="(https:\/\/www\.linkedin\.com\/jobs\/view\/[^"?]+)/g, html);
+    const locs    = getAll(/<span[^>]*location[^>]*>([\s\S]*?)<\/span>/g, html);
+    const times   = getAll(/<time[^>]*datetime="([^"]*)"[^>]*>/g, html);
+    for (let i = 0; i < Math.min(titles.length, links.length, 25); i++) {
+      if (!titles[i] || !links[i]) continue;
+      jobs.push({
+        id: `linkedin-${Date.now()}-${i}`,
+        title: titles[i], company: 'Unknown', location: locs[i] || 'London', salary: '',
+        url: links[i],
+        posted: times[i] ? new Date(times[i]).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : '',
+        description: '', source: 'linkedin',
+      });
+    }
+  }
+
   return jobs;
 }
 
