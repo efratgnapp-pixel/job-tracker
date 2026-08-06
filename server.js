@@ -1040,20 +1040,23 @@ const server = http.createServer(async (req, res) => {
       const keywords = u.searchParams.get('keywords') || 'Project Manager OR Business Operations Manager';
       const location = u.searchParams.get('location') || 'London';
 
-      // Fetch up to 3 pages (75 results) to capture all available jobs
+      // Fetch multiple pages — LinkedIn returns ~10 per page via guest API
       const allJobs = [];
-      const pageSize = 25;
-      for (let start = 0; start < 75; start += pageSize) {
-        const liUrl = `https://www.linkedin.com/jobs-guest/jobs/api/seeMoreJobPostings/search?keywords=${encodeURIComponent(keywords)}&location=${encodeURIComponent(location)}&start=${start}&count=${pageSize}&f_TPR=r2592000`;
+      const seenIds = new Set();
+      for (let start = 0; start < 100; start += 10) {
+        const liUrl = `https://www.linkedin.com/jobs-guest/jobs/api/seeMoreJobPostings/search?keywords=${encodeURIComponent(keywords)}&location=${encodeURIComponent(location)}&start=${start}&count=10&f_TPR=r2592000`;
         const result = await httpsGet(liUrl);
         if ([403, 429, 999].includes(result.status)) {
           if (start === 0) { send(res, 200, { jobs: [], blocked: true, keywords, location }); return; }
-          break; // blocked on later page — return what we have
+          break;
         }
         if (result.status !== 200) break;
         const pageJobs = parseLinkedInJobs(result.body);
-        allJobs.push(...pageJobs);
-        if (pageJobs.length < pageSize) break; // no more results
+        if (pageJobs.length === 0) break; // no more results
+        // Deduplicate by URL
+        for (const job of pageJobs) {
+          if (!seenIds.has(job.url)) { seenIds.add(job.url); allJobs.push(job); }
+        }
       }
 
       send(res, 200, { jobs: allJobs, keywords, location });
