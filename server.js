@@ -59,14 +59,33 @@ function saveUsers(users) {
   fs.writeFileSync(USERS_FILE, JSON.stringify(users, null, 2));
 }
 
-// ── Session store ─────────────────────────────────────────────────────────────
-const sessions    = new Map(); // token → { expires, email }
+// ── Session store (persisted to disk so restarts don't log everyone out) ──────
+const SESSIONS_FILE = path.join(__dirname, 'sessions.json');
 const oauthStates = new Map(); // state → expiry timestamp (CSRF protection)
 
+function loadSessions() {
+  try {
+    const raw = fs.readFileSync(SESSIONS_FILE, 'utf8');
+    return new Map(Object.entries(JSON.parse(raw)));
+  } catch { return new Map(); }
+}
+function saveSessions(map) {
+  try {
+    const now = Date.now();
+    const out = {};
+    for (const [k, v] of map) if (v.expires > now) out[k] = v; // prune expired
+    fs.writeFileSync(SESSIONS_FILE, JSON.stringify(out));
+  } catch (e) { console.error('[sessions] save error:', e.message); }
+}
+
+const sessions = loadSessions(); // token → { expires, email }
+
+// Prune expired sessions hourly and persist
 setInterval(() => {
   const now = Date.now();
   for (const [k, v] of sessions)    if (now > v.expires) sessions.delete(k);
   for (const [k, v] of oauthStates) if (now > v) oauthStates.delete(k);
+  saveSessions(sessions);
 }, 3_600_000);
 
 function parseCookies(header) {
@@ -713,7 +732,7 @@ const server = http.createServer(async (req, res) => {
       }
 
       const token = crypto.randomBytes(32).toString('hex');
-      sessions.set(token, { expires: Date.now() + 7 * 24 * 60 * 60 * 1000, email });
+      sessions.set(token, { expires: Date.now() + 7 * 24 * 60 * 60 * 1000, email }); saveSessions(sessions);
       console.log(`[auth] login: ${email}`);
       res.writeHead(302, {
         'Set-Cookie': `session=${token}; Max-Age=${7 * 24 * 60 * 60}; ${cookieFlags(req)}`,
@@ -820,7 +839,7 @@ const server = http.createServer(async (req, res) => {
 
       // Create session
       const token = crypto.randomBytes(32).toString('hex');
-      sessions.set(token, { expires: Date.now() + 7 * 24 * 60 * 60 * 1000, email: emailNorm });
+      sessions.set(token, { expires: Date.now() + 7 * 24 * 60 * 60 * 1000, email: emailNorm }); saveSessions(sessions);
       res.writeHead(200, {
         'Set-Cookie': `session=${token}; Max-Age=${7 * 24 * 60 * 60}; ${cookieFlags(req)}`,
         'Content-Type': 'application/json',
@@ -849,7 +868,7 @@ const server = http.createServer(async (req, res) => {
       if (!match) { send(res, 401, { error: 'Invalid email or password.' }); return; }
 
       const token = crypto.randomBytes(32).toString('hex');
-      sessions.set(token, { expires: Date.now() + 7 * 24 * 60 * 60 * 1000, email: emailNorm });
+      sessions.set(token, { expires: Date.now() + 7 * 24 * 60 * 60 * 1000, email: emailNorm }); saveSessions(sessions);
       console.log(`[login-email] ${emailNorm}`);
       res.writeHead(200, {
         'Set-Cookie': `session=${token}; Max-Age=${7 * 24 * 60 * 60}; ${cookieFlags(req)}`,
