@@ -1074,26 +1074,81 @@ const server = http.createServer(async (req, res) => {
       const keywords = rawKw.replace(/["""''`]/g, '').replace(/\s+/g, ' ').trim();
       const location = u.searchParams.get('location') || 'London';
 
-      // Fetch multiple pages — LinkedIn returns ~10 per page via guest API
+      // ── Step 1: try LinkedIn guest API (works from localhost, blocked on cloud IPs) ──
       const allJobs = [];
       const seenIds = new Set();
+      let liBlocked = false;
+
       for (let start = 0; start < 100; start += 10) {
-        const liUrl = `https://www.linkedin.com/jobs-guest/jobs/api/seeMoreJobPostings/search?keywords=${encodeURIComponent(keywords)}&location=${encodeURIComponent(location)}&start=${start}&count=10&f_TPR=r2592000`;
+        const liUrl = `https://www.linkedin.com/jobs-guest/jobs/api/seeMoreJobPostings/search?keywords=${encodeURIComponent(keywords)}&location=${encodeURIComponent(location)}&start=${start}&count=10`;
         const result = await httpsGet(liUrl);
-        if ([403, 429, 999].includes(result.status)) {
-          if (start === 0) { send(res, 200, { jobs: [], blocked: true, keywords, location }); return; }
+        if ([403, 429, 999].includes(result.status) || result.status !== 200) {
+          if (start === 0) liBlocked = true;
           break;
         }
-        if (result.status !== 200) break;
         const pageJobs = parseLinkedInJobs(result.body);
-        if (pageJobs.length === 0) break; // no more results
-        // Deduplicate by URL
+        if (pageJobs.length === 0) break;
         for (const job of pageJobs) {
           if (!seenIds.has(job.url)) { seenIds.add(job.url); allJobs.push(job); }
         }
       }
 
-      send(res, 200, { jobs: allJobs, keywords, location });
+      if (allJobs.length > 0) {
+        send(res, 200, { jobs: allJobs, keywords, location });
+        return;
+      }
+
+      // ── Step 2: LinkedIn blocked or returned nothing — fall back to JSearch ──
+      const JSEARCH_KEY = process.env.JSEARCH_API_KEY;
+      if (!JSEARCH_KEY) {
+        send(res, 200, { jobs: [], blocked: liBlocked, keywords, location });
+        return;
+      }
+
+      const jJobs = [];
+      const jSeen = new Set();
+      // Run two pages for more results
+      for (let page = 1; page <= 3; page++) {
+        const params = new URLSearchParams({
+          query: `${keywords} ${location}`,
+          page: String(page),
+          num_pages: '1',
+          date_posted: 'month',
+          country: 'gb',
+        });
+        const result = await new Promise((resolve, reject) => {
+          const req2 = https.request({
+            hostname: 'jsearch.p.rapidapi.com',
+            path: `/search?${params}`,
+            method: 'GET',
+            headers: { 'X-RapidAPI-Key': JSEARCH_KEY, 'X-RapidAPI-Host': 'jsearch.p.rapidapi.com' },
+          }, res2 => {
+            const chunks = [];
+            res2.on('data', c => chunks.push(c));
+            res2.on('end', () => resolve({ status: res2.statusCode, body: Buffer.concat(chunks).toString('utf8') }));
+          });
+          req2.on('error', reject);
+          req2.end();
+        });
+        if (result.status !== 200) break;
+        const data = JSON.parse(result.body);
+        for (const job of (data.data || [])) {
+          const id = `jsearch-${Buffer.from((job.job_id || job.job_title + job.employer_name).slice(0, 40)).toString('base64url').slice(0, 14)}`;
+          if (jSeen.has(id)) continue;
+          jSeen.add(id);
+          jJobs.push({
+            id, title: job.job_title || 'Unknown', company: job.employer_name || 'Unknown',
+            location: [job.job_city, job.job_state].filter(Boolean).join(', ') || location,
+            salary: job.job_min_salary ? `£${job.job_min_salary.toLocaleString()}${job.job_max_salary ? ` – £${job.job_max_salary.toLocaleString()}` : ''}` : '',
+            url: job.job_apply_link || job.job_google_link || '',
+            posted: job.job_posted_at_datetime_utc ? new Date(job.job_posted_at_datetime_utc).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : '',
+            description: (job.job_description || '').slice(0, 600),
+            source: 'linkedin',
+          });
+        }
+      }
+
+      send(res, 200, { jobs: jJobs, keywords, location });
     } catch (err) { send(res, 200, { jobs: [], error: err.message }); }
     return;
   }
