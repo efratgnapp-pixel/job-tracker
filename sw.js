@@ -1,6 +1,6 @@
 'use strict';
 
-const CACHE = 'job-tracker-v1';
+const CACHE = 'job-tracker-v2';
 
 const PRECACHE = [
   '/job-tracker.html',
