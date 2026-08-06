@@ -1069,7 +1069,9 @@ const server = http.createServer(async (req, res) => {
     if (!url) { send(res, 400, { error: 'url required' }); return; }
     try {
       const u = new URL(url);
-      const keywords = u.searchParams.get('keywords') || 'Project Manager OR Business Operations Manager';
+      // Strip quotes and special chars that confuse LinkedIn's guest API
+      const rawKw = u.searchParams.get('keywords') || 'Project Manager OR Business Operations Manager';
+      const keywords = rawKw.replace(/["""''`]/g, '').replace(/\s+/g, ' ').trim();
       const location = u.searchParams.get('location') || 'London';
 
       // Fetch multiple pages — LinkedIn returns ~10 per page via guest API
