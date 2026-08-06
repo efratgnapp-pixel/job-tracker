@@ -1606,6 +1606,7 @@
 
   // ── Persistence ─────────────────────────────────────────
   function setSyncStatus(status) {
+    console.log('[sync]', status, new Error().stack.split('\n')[2]);
     const el = document.getElementById('syncIndicator');
     if (!el) return;
     if (status === 'synced') {
