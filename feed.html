@@ -517,9 +517,12 @@ async function addToTracker(id) {
 
   try {
     const dataRes = await fetch('/api/data');
+    if (!dataRes.ok) throw new Error(`Auth error ${dataRes.status} — try refreshing the page.`);
     const raw = await dataRes.json();
-    const existingArr = Array.isArray(raw) ? raw : (raw['jobTrackerData_v1'] ? raw['jobTrackerData_v1'] : Object.values(raw));
-    const existing = Object.fromEntries(existingArr.filter(j => j?.id).map(j => [j.id, j]));
+
+    // Parse existing jobs — server stores {jobTrackerData_v1: [...]} format
+    const existingArr = Array.isArray(raw) ? raw
+      : (raw['jobTrackerData_v1'] ? raw['jobTrackerData_v1'] : Object.values(raw).filter(v => v && typeof v === 'object' && v.id));
 
     const newId = Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
     const score = job._score;
@@ -539,27 +542,30 @@ async function addToTracker(id) {
       addedAt: new Date().toISOString().slice(0, 10),
     };
 
-    existing[newId] = newJob;
+    // Always save in {jobTrackerData_v1: [...]} format so job-tracker.html reads it correctly
+    const updatedArr = [...existingArr.filter(j => j?.id), newJob];
+    const payload = { jobTrackerData_v1: updatedArr };
 
-    await fetch('/api/data', {
+    const saveRes = await fetch('/api/data', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(existing),
+      body: JSON.stringify(payload),
     });
+    if (!saveRes.ok) throw new Error(`Save failed (${saveRes.status}) — try refreshing the page.`);
 
     if (btn) btn.textContent = 'Scoring…';
 
     try {
       const scored = await fetchScore(job);
-      existing[newId] = { ...newJob, matchScore: scored.score ?? null, matchScoreData: scored };
+      const scoredArr = updatedArr.map(j => j.id === newId ? { ...j, matchScore: scored.score ?? null, matchScoreData: scored } : j);
       await fetch('/api/data', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(existing),
+        body: JSON.stringify({ jobTrackerData_v1: scoredArr }),
       });
     } catch { /* score failed — job already saved without score */ }
 
-    trackerJobs = Object.values(existing);
+    trackerJobs = updatedArr;
 
     const card = document.querySelector(`[data-id="${id}"]`);
     if (card) { card.classList.add('card-gone'); setTimeout(() => card.remove(), 350); }
