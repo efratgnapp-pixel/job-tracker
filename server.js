@@ -13,7 +13,7 @@ const crypto = require('crypto');
 const Busboy = require('busboy');
 const pdfParse = require('pdf-parse');
 const mammoth = require('mammoth');
-const bcrypt = require('bcrypt');
+const bcrypt = require('bcryptjs');
 
 const PORT    = process.env.PORT || 3001;
 const HTML    = path.join(__dirname, 'job-tracker.html');
