@@ -93,9 +93,78 @@
       text-align: left;
     }
 
-    .divider { height: 1px; background: var(--border); margin: 36px 0 24px; }
+    .divider {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin: 24px 0;
+      color: var(--text-muted);
+      font-size: .78rem;
+    }
+    .divider::before, .divider::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: var(--border);
+    }
 
-    .footer { font-size: .78rem; color: var(--text-muted); }
+    .email-form { text-align: left; }
+
+    .email-form input {
+      width: 100%;
+      padding: 11px 13px;
+      border: 1.5px solid var(--border);
+      border-radius: 8px;
+      font-size: .9rem;
+      color: var(--text);
+      outline: none;
+      margin-bottom: 10px;
+      transition: border-color .15s, box-shadow .15s;
+    }
+    .email-form input:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(79,70,229,.12);
+    }
+
+    .btn-email {
+      width: 100%;
+      padding: 12px;
+      background: var(--accent);
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      font-size: .95rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: opacity .15s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+    }
+    .btn-email:hover { opacity: .9; }
+    .btn-email:disabled { opacity: .6; cursor: not-allowed; }
+
+    .spinner {
+      width: 15px; height: 15px;
+      border: 2px solid rgba(255,255,255,.4);
+      border-top-color: #fff;
+      border-radius: 50%;
+      animation: spin .7s linear infinite;
+      display: none;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .register-link {
+      text-align: center;
+      font-size: .8rem;
+      color: var(--text-muted);
+      margin-top: 16px;
+    }
+    .register-link a { color: var(--accent); font-weight: 600; text-decoration: none; }
+    .register-link a:hover { text-decoration: underline; }
+
+    .footer { font-size: .78rem; color: var(--text-muted); margin-top: 20px; }
 
     @media (max-width: 768px) {
       body { padding: 16px; }
@@ -122,7 +191,20 @@
 
     <div id="error" class="error"></div>
 
-    <div class="divider"></div>
+    <div class="divider">or</div>
+
+    <!-- Email + password login -->
+    <form class="email-form" id="emailForm" novalidate>
+      <input type="email" id="loginEmail" placeholder="Email address" autocomplete="email" required />
+      <input type="password" id="loginPassword" placeholder="Password" autocomplete="current-password" required />
+      <button type="submit" class="btn-email" id="loginBtn">
+        <div class="spinner" id="loginSpinner"></div>
+        <span id="loginLabel">Sign in with email</span>
+      </button>
+    </form>
+
+    <p class="register-link">Don't have an account? <a href="/register.html">Create one</a></p>
+
     <p class="footer">Access is restricted to authorised accounts only</p>
   </div>
 
@@ -135,12 +217,45 @@
       not_allowed:  'This Google account is not authorised to access the tracker.',
       server:       'A server error occurred. Please try again.',
     };
-    const err = new URLSearchParams(location.search).get('error');
+    const params = new URLSearchParams(location.search);
+    const err = params.get('error');
     if (err) {
       const el = document.getElementById('error');
       el.textContent = MESSAGES[err] || 'An error occurred. Please try again.';
       el.style.display = 'block';
     }
+
+    document.getElementById('emailForm').addEventListener('submit', async e => {
+      e.preventDefault();
+      const email    = document.getElementById('loginEmail').value.trim();
+      const password = document.getElementById('loginPassword').value;
+      const errEl    = document.getElementById('error');
+      const btn      = document.getElementById('loginBtn');
+      const spinner  = document.getElementById('loginSpinner');
+      const label    = document.getElementById('loginLabel');
+
+      errEl.style.display = 'none';
+      btn.disabled = true;
+      spinner.style.display = 'block';
+      label.textContent = 'Signing in…';
+
+      try {
+        const res = await fetch('/api/login-email', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, password }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Login failed.');
+        window.location.href = data.redirect || '/job-tracker.html';
+      } catch (ex) {
+        errEl.textContent = ex.message;
+        errEl.style.display = 'block';
+        btn.disabled = false;
+        spinner.style.display = 'none';
+        label.textContent = 'Sign in with email';
+      }
+    });
   </script>
 </body>
 </html>
