@@ -2059,25 +2059,25 @@ Rules:
   // ── GET /api/data → return saved jobs ────────────────────────────────────
   if (req.method === 'GET' && pathname === '/api/data') {
     const file = userDataFile(session.email);
+    const tryRestore = async () => {
+      await restoreUserFromGist(session.email);
+      try { return fs.readFileSync(file, 'utf8'); } catch { return '{}'; }
+    };
     try {
       let raw = fs.readFileSync(file, 'utf8');
       const trimmed = raw.trim();
-      if (!trimmed || trimmed === '{}' || trimmed === '[]') {
-        await restoreUserFromGist(session.email);
-        try { raw = fs.readFileSync(file, 'utf8'); } catch { raw = '{}'; }
+      // Restore if empty, trivial, or invalid JSON
+      let needsRestore = !trimmed || trimmed === '{}' || trimmed === '[]';
+      if (!needsRestore) {
+        try { JSON.parse(raw); } catch { needsRestore = true; console.warn('[api/data] corrupted JSON, restoring from Gist'); }
       }
+      if (needsRestore) raw = await tryRestore();
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(raw);
     } catch {
-      try {
-        await restoreUserFromGist(session.email);
-        const restored = fs.readFileSync(file, 'utf8');
-        res.writeHead(200, { 'Content-Type': 'application/json' });
-        res.end(restored);
-      } catch {
-        res.writeHead(200, { 'Content-Type': 'application/json' });
-        res.end('{}');
-      }
+      const raw = await tryRestore();
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(raw);
     }
     return;
   }
