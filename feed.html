@@ -518,7 +518,14 @@ async function addToTracker(id) {
   try {
     const dataRes = await fetch('/api/data');
     if (!dataRes.ok) throw new Error(`Auth error ${dataRes.status} — try refreshing the page.`);
-    const raw = await dataRes.json();
+
+    // Parse server response — fall back to localStorage if data is corrupted
+    let raw;
+    try { raw = await dataRes.json(); }
+    catch {
+      const ls = localStorage.getItem('jobTrackerData_v1');
+      raw = ls ? { jobTrackerData_v1: JSON.parse(ls) } : { jobTrackerData_v1: [] };
+    }
 
     // Parse existing jobs — server stores {jobTrackerData_v1: [...]} format
     const existingArr = Array.isArray(raw) ? raw

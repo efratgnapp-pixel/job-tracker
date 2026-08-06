@@ -2188,8 +2188,12 @@ Rules:
     req.on('data', d => body += d);
     req.on('end', () => {
       try {
-        JSON.parse(body); // validate
-        fs.writeFileSync(userDataFile(session.email), body);
+        JSON.parse(body); // validate before writing
+        // Atomic write: write to temp file first, then rename — prevents corruption
+        const target = userDataFile(session.email);
+        const tmp = target + '.tmp';
+        fs.writeFileSync(tmp, body);
+        fs.renameSync(tmp, target);
         backupToGist(body, emailToFilename(session.email));
         send(res, 200, { ok: true });
       } catch (err) {
