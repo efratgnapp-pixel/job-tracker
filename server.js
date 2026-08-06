@@ -1039,15 +1039,24 @@ const server = http.createServer(async (req, res) => {
       const u = new URL(url);
       const keywords = u.searchParams.get('keywords') || 'Project Manager OR Business Operations Manager';
       const location = u.searchParams.get('location') || 'London';
-      const liUrl = `https://www.linkedin.com/jobs-guest/jobs/api/seeMoreJobPostings/search?keywords=${encodeURIComponent(keywords)}&location=${encodeURIComponent(location)}&start=0&count=25&f_TPR=r2592000`;
-      const result = await httpsGet(liUrl);
-      if ([403, 429, 999].includes(result.status)) {
-        send(res, 200, { jobs: [], blocked: true, keywords, location }); return;
+
+      // Fetch up to 3 pages (75 results) to capture all available jobs
+      const allJobs = [];
+      const pageSize = 25;
+      for (let start = 0; start < 75; start += pageSize) {
+        const liUrl = `https://www.linkedin.com/jobs-guest/jobs/api/seeMoreJobPostings/search?keywords=${encodeURIComponent(keywords)}&location=${encodeURIComponent(location)}&start=${start}&count=${pageSize}&f_TPR=r2592000`;
+        const result = await httpsGet(liUrl);
+        if ([403, 429, 999].includes(result.status)) {
+          if (start === 0) { send(res, 200, { jobs: [], blocked: true, keywords, location }); return; }
+          break; // blocked on later page — return what we have
+        }
+        if (result.status !== 200) break;
+        const pageJobs = parseLinkedInJobs(result.body);
+        allJobs.push(...pageJobs);
+        if (pageJobs.length < pageSize) break; // no more results
       }
-      if (result.status !== 200) {
-        send(res, 200, { jobs: [], error: `LinkedIn returned ${result.status}`, keywords, location }); return;
-      }
-      send(res, 200, { jobs: parseLinkedInJobs(result.body), keywords, location });
+
+      send(res, 200, { jobs: allJobs, keywords, location });
     } catch (err) { send(res, 200, { jobs: [], error: err.message }); }
     return;
   }
