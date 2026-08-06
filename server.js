@@ -683,10 +683,9 @@ const server = http.createServer(async (req, res) => {
       const token = crypto.randomBytes(32).toString('hex');
       sessions.set(token, { expires: Date.now() + 7 * 24 * 60 * 60 * 1000, email });
       console.log(`[auth] login: ${email}`);
-      const cvExists = fs.existsSync(userCvFile(email));
       res.writeHead(302, {
         'Set-Cookie': `session=${token}; Max-Age=${7 * 24 * 60 * 60}; ${cookieFlags(req)}`,
-        Location: cvExists ? '/' : '/onboarding.html',
+        Location: '/',
       });
       res.end();
     } catch (err) {

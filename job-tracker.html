@@ -1041,6 +1041,11 @@
         <a href="/archive.html" class="row-menu-item" style="text-decoration:none">📦 Archive</a>
         <div class="row-menu-sep"></div>
         <button class="row-menu-item" onclick="closeRowMenus(); openFeedbackModal()">💬 Feedback</button>
+        <div class="row-menu-sep"></div>
+        <a href="/auth/logout" class="row-menu-item" style="text-decoration:none;color:#dc2626">
+          <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+          Sign out
+        </a>
       </div>
     </div>
   </div>
@@ -1606,7 +1611,6 @@
 
   // ── Persistence ─────────────────────────────────────────
   function setSyncStatus(status) {
-    console.log('[sync]', status, new Error().stack.split('\n')[2]);
     const el = document.getElementById('syncIndicator');
     if (!el) return;
     if (status === 'synced') {
@@ -1634,7 +1638,7 @@
         setSyncStatus('synced');
         return;
       }
-    } catch (e) { console.error('[load] fetch/parse error:', e); }
+    } catch {}
     // Fallback to localStorage
     try { jobs = JSON.parse(localStorage.getItem(STORAGE_KEY)) || []; }
     catch { jobs = []; }
